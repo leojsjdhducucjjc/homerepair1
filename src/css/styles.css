@@ -55,33 +55,14 @@ body {
 .brand-block {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.58rem;
 }
 
-.roof-mark {
-  width: 52px;
-  height: 30px;
-  border: 2px solid #d8ebff;
-  border-radius: 4px;
-  position: relative;
-}
-
-.roof-mark::before,
-.roof-mark::after {
-  content: "";
-  position: absolute;
-  left: 5px;
-  right: 5px;
-  height: 2px;
-  background: #d8ebff;
-}
-
-.roof-mark::before {
-  top: 10px;
-}
-
-.roof-mark::after {
-  bottom: 8px;
+.brand-logo {
+  width: clamp(54px, 6.2vw, 72px);
+  height: auto;
+  display: block;
+  border-radius: 6px;
 }
 
 .brand-title {
@@ -426,7 +407,7 @@ body {
     width: 100%;
   }
 
-  .btn {
+  .header-actions .btn {
     flex: 1 1 150px;
   }
 
@@ -461,11 +442,32 @@ body {
     text-align: center;
     font-size: 0.9rem;
   }
+
+  .bottom-buttons .btn {
+    flex: 0 0 auto;
+  }
 }
 
 @media (max-width: 520px) {
   .page-wrap {
     padding: 0;
+  }
+
+  .brand-logo {
+    width: 56px;
+  }
+
+  .hero {
+    padding: 0.45rem 0.5rem 0.6rem;
+    background: linear-gradient(180deg, #0f3f74 0%, #0a315c 100%);
+  }
+
+  .hero-banner-image {
+    height: auto;
+    object-fit: contain;
+    object-position: left center;
+    border: 1px solid #2f79c8;
+    border-radius: 10px;
   }
 
   .services-grid {
@@ -504,20 +506,32 @@ body {
   }
 
   .hero-cta {
-    left: 50%;
-    width: calc(100% - 1rem);
-    bottom: 0.5rem;
-    gap: 0.45rem;
+    position: static;
+    transform: none;
+    width: 100%;
+    margin-top: 0.45rem;
+    justify-content: stretch;
+    gap: 0.42rem;
   }
 
   .hero-cta .btn {
-    flex: 1 1 100%;
+    flex: 1 1 calc(50% - 0.21rem);
     min-width: 0;
-    padding: 0.6rem 0.8rem;
-    font-size: 0.86rem;
+    padding: 0.58rem 0.55rem;
+    font-size: 0.82rem;
   }
 
   .bottom-buttons {
     flex-direction: column;
+    gap: 0.48rem;
+  }
+
+  .bottom-buttons .btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    flex: 0 0 auto;
+    padding: 0.72rem 0.86rem;
+    font-size: 0.9rem;
   }
 }
