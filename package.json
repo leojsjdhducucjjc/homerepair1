@@ -1,0 +1,15 @@
+{
+  "name": "jasons-pro-finish-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Contractor-style website landing page served with Node and Express.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
