@@ -81,8 +81,16 @@
                   <input id="email" name="email" type="email" autocomplete="email" required />
                 </div>
                 <div>
-                  <label for="city">City / Area</label>
-                  <input id="city" name="city" type="text" autocomplete="address-level2" required />
+                  <label for="city">Property Address / Area</label>
+                  <input
+                    id="city"
+                    name="city"
+                    type="text"
+                    autocomplete="street-address"
+                    placeholder="Start typing the property address"
+                    data-address-input
+                    required
+                  />
                 </div>
               </div>
 
@@ -115,7 +123,7 @@
           </section>
         </section>
 
-        <footer class="site-footer"><p>Trusted local contractor service since 2011.</p><p>&copy; <span id="year"></span> Jason's Lake Ozarks Pro Painting and Remodeling</p></footer>
+        <footer class="site-footer"><p>Trusted local contractor service for Lake of the Ozarks homes.</p><p>&copy; <span id="year"></span> Jason's Lake Ozarks Pro Painting and Remodeling</p></footer>
       </article>
     </main>
     <script src="./src/js/main.js"></script>

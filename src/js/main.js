@@ -48,6 +48,8 @@ const quoteForm = document.querySelector("[data-quote-form]");
 if (quoteForm) {
   const submitButton = quoteForm.querySelector(".submit-btn");
   const formStatus = quoteForm.querySelector("[data-form-status]");
+  const addressInput = quoteForm.querySelector("[data-address-input]");
+  initializeGoogleAddressAutocomplete(addressInput);
 
   quoteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -232,4 +234,83 @@ function escapeHtml(value) {
 
 function escapeHtmlAttr(value) {
   return escapeHtml(value).replaceAll("`", "&#96;");
+}
+
+let googleMapsScriptPromise = null;
+
+async function initializeGoogleAddressAutocomplete(addressInput) {
+  if (!addressInput) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/maps-config", {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+    const config = await response.json().catch(() => ({}));
+    const apiKey = typeof config.googleMapsApiKey === "string" ? config.googleMapsApiKey.trim() : "";
+
+    if (!response.ok || !apiKey) {
+      return;
+    }
+
+    await loadGoogleMapsPlaces(apiKey);
+
+    if (!window.google?.maps?.places?.Autocomplete) {
+      return;
+    }
+
+    const autocomplete = new window.google.maps.places.Autocomplete(addressInput, {
+      componentRestrictions: { country: "us" },
+      fields: ["formatted_address"],
+      types: ["address"],
+    });
+
+    autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+
+      if (place?.formatted_address) {
+        addressInput.value = place.formatted_address;
+      }
+    });
+  } catch (_error) {
+    // Keep the field usable as a normal text input if Google autocomplete is unavailable.
+  }
+}
+
+function loadGoogleMapsPlaces(apiKey) {
+  if (googleMapsScriptPromise) {
+    return googleMapsScriptPromise;
+  }
+
+  googleMapsScriptPromise = new Promise((resolve, reject) => {
+    if (window.google?.maps?.places) {
+      resolve();
+      return;
+    }
+
+    const existingScript = document.querySelector("[data-google-maps-loader]");
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(), { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("Google Maps failed to load.")), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleMapsLoader = "true";
+    script.addEventListener("load", () => resolve(), { once: true });
+    script.addEventListener("error", () => reject(new Error("Google Maps failed to load.")), {
+      once: true,
+    });
+    document.head.appendChild(script);
+  });
+
+  return googleMapsScriptPromise;
 }

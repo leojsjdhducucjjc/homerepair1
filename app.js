@@ -168,6 +168,12 @@ app.post("/api/quote-requests", async (req, res) => {
   });
 });
 
+app.get("/api/maps-config", (_req, res) => {
+  res.json({
+    googleMapsApiKey: process.env.GOOGLE_MAPS_BROWSER_API_KEY || "",
+  });
+});
+
 app.get("/dashboard", requireAuthenticatedPage, (_req, res) => {
   res.sendFile(path.join(rootDir, "dashboard.html"));
 });
