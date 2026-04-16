@@ -78,7 +78,7 @@ body.nav-hidden .sticky-nav-shell {
 }
 
 .brand-logo {
-  width: clamp(112px, 9.5vw, 138px);
+  width: clamp(128px, 11vw, 156px);
   height: auto;
   display: block;
   border-radius: 4px;
@@ -854,7 +854,7 @@ body.nav-hidden .sticky-nav-shell {
   }
 
   .brand-logo {
-    width: 88px;
+    width: 100px;
   }
 
   .hero {
