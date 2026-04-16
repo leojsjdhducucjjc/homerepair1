@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Owner Login | Jason's Lake Ozarks Pro Painting and Remodeling</title>
+    <meta name="description" content="Secure owner login for the quote request dashboard." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./src/css/styles.css" />
+  </head>
+  <body class="dashboard-page login-page">
+    <main class="page-wrap">
+      <article class="flyer">
+        <div class="sticky-nav-shell">
+          <header class="top-header">
+            <div class="brand-block">
+              <a class="brand-home-link" href="./index.html" aria-label="Go to Home"><img class="brand-logo" src="./assets/header-logo.png" alt="Jason's Lake Ozarks Pro Painting and Remodeling logo" /></a>
+            </div>
+          </header>
+        </div>
+
+        <section class="page-content login-content">
+          <article class="content-card login-card">
+            <p class="login-kicker">Owner Access</p>
+            <h1>Sign In to the Dashboard</h1>
+            <p class="login-copy">Use your owner username and password to review quote requests.</p>
+            <p class="form-status" data-login-status role="alert" aria-live="polite"></p>
+
+            <form class="login-form" method="post" action="/auth/login">
+              <div>
+                <label for="username">Username</label>
+                <input id="username" name="username" type="text" autocomplete="username" required />
+              </div>
+              <div>
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" autocomplete="current-password" required />
+              </div>
+              <button class="submit-btn" type="submit">Sign In</button>
+            </form>
+          </article>
+        </section>
+      </article>
+    </main>
+    <script src="./src/js/main.js"></script>
+  </body>
+</html>

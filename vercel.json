@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "functions": {
+    "server.js": {
+      "runtime": "nodejs22.x",
+      "includeFiles": "{assets/**,src/**,*.html,data/**}"
+    }
+  },
+  "routes": [
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/server.js"
+    }
+  ]
+}
