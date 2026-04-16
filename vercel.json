@@ -1,17 +1,14 @@
 {
   "version": 2,
   "functions": {
-    "server.js": {
-      "includeFiles": "{assets/**,src/**,*.html,data/**}"
+    "api/index.js": {
+      "includeFiles": "{assets/**,src/**,*.html,supabase/**}"
     }
   },
-  "routes": [
+  "rewrites": [
     {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/server.js"
+      "source": "/(.*)",
+      "destination": "/api"
     }
   ]
 }
