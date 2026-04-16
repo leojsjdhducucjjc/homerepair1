@@ -9,6 +9,10 @@ if (loginStatus) {
   if (params.get("error") === "invalid") {
     loginStatus.textContent = "That username or password did not match.";
     loginStatus.dataset.state = "error";
+  } else if (params.get("error") === "config") {
+    loginStatus.textContent =
+      "Dashboard storage is not configured yet. Add the Supabase environment variables and database tables first.";
+    loginStatus.dataset.state = "error";
   }
 }
 
@@ -21,6 +25,10 @@ if (resetStatus) {
   if (success === "1") {
     resetStatus.textContent = "Password updated successfully.";
     resetStatus.dataset.state = "success";
+  } else if (error === "config") {
+    resetStatus.textContent =
+      "Password reset is not available until Supabase is configured and the database tables are set up.";
+    resetStatus.dataset.state = "error";
   } else if (error === "current") {
     resetStatus.textContent = "Your current password was incorrect.";
     resetStatus.dataset.state = "error";
