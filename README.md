@@ -1,13 +1,6 @@
 # New Website Project
 
-Contractor-style landing page with a Node + Express server so you can run it with npm.
-
-## Project structure
-
-- `index.html`
-- `src/css/styles.css`
-- `src/js/main.js`
-- `assets/`
+Contractor-style website with a Node + Express server.
 
 ## Run with npm
 

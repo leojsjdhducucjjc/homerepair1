@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact & Free Quote | Jason's Pro Finish & Solutions</title>
+    <meta name="description" content="Request a free quote for interior painting, flooring, power washing, and remodeling projects." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./src/css/styles.css" />
+  </head>
+  <body>
+    <main class="page-wrap">
+      <article class="flyer">
+        <div class="sticky-nav-shell">
+<header class="top-header">
+          <div class="brand-block">
+            <a class="brand-home-link" href="./index.html" aria-label="Go to Home"><img class="brand-logo" src="./assets/header-logo.png" alt="Jason's Pro Finish and Solutions logo" /></a>
+            <div><p class="brand-title">Jason's</p><p class="brand-sub">PRO FINISH & SOLUTIONS</p></div>
+          </div>
+</header>
+<nav class="page-nav" aria-label="Primary">
+          <div class="nav-row nav-row-main">
+            <a href="./index.html">Home</a>
+            <a class="active" href="./services.html">Services</a>
+            <a href="./testimonials.html">Testimonials</a>
+          </div>
+          <div class="nav-row nav-row-secondary">
+            <a href="./gallery.html">Before &amp; After</a>
+            <a href="./service-areas.html">Service Areas</a>
+          </div>
+          <a class="nav-quote" href="./contact.html">Free Quote</a>
+        </nav>
+        </div>
+
+        <section class="page-hero"><h1>Contact & Free Quote</h1><p>Tell us about your project and we will send a clear plan, timeline, and estimate.</p></section>
+
+        <div class="licensed-banner">Licensed and insured. Written estimates. Workmanship warranty included.</div>
+
+        <section class="page-content">
+          <section class="content-grid-2">
+            <article class="content-card">
+              <h2>Contact Options</h2>
+              <ul class="feature-list">
+                <li>Call: <a href="tel:+15735002002">5735002002</a></li>
+                <li>Text: <a href="sms:+15735002002">5735002002</a></li>
+                <li>Email: <a href="mailto:jasonslakeozarkspropainting@gmail.com">jasonslakeozarkspropainting@gmail.com</a></li>
+                <li>Hours: Mon-Sat, 8:00 AM - 6:00 PM</li>
+              </ul>
+            </article>
+            <article class="content-card">
+              <h2>What to Include for Faster Quotes</h2>
+              <ul class="feature-list">
+                <li>Property city/location</li>
+                <li>Service needed (paint, flooring, wash, remodel)</li>
+                <li>Project size and target timeline</li>
+                <li>Any before photos or inspiration photos</li>
+              </ul>
+            </article>
+          </section>
+
+          <section class="content-card">
+            <h2>Request Form</h2>
+            <form class="contact-form" action="mailto:jasonslakeozarkspropainting@gmail.com" method="post" enctype="text/plain">
+              <div class="form-row">
+                <div>
+                  <label for="name">Full Name</label>
+                  <input id="name" name="Full Name" type="text" required />
+                </div>
+                <div>
+                  <label for="phone">Phone Number</label>
+                  <input id="phone" name="Phone" type="tel" required />
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div>
+                  <label for="email">Email</label>
+                  <input id="email" name="Email" type="email" required />
+                </div>
+                <div>
+                  <label for="city">City / Area</label>
+                  <input id="city" name="City" type="text" required />
+                </div>
+              </div>
+
+              <div class="form-row">
+                <div>
+                  <label for="service">Service Needed</label>
+                  <select id="service" name="Service" required>
+                    <option value="">Select a service</option>
+                    <option>Interior Painting</option>
+                    <option>Luxury Flooring</option>
+                    <option>Power Washing</option>
+                    <option>Bathroom & Kitchen Remodels</option>
+                    <option>Multiple Services</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="timeline">Target Timeline</label>
+                  <input id="timeline" name="Timeline" type="text" placeholder="Example: Next month" />
+                </div>
+              </div>
+
+              <div>
+                <label for="message">Project Details</label>
+                <textarea id="message" name="Project Details" placeholder="Tell us what you want updated."></textarea>
+              </div>
+
+              <button class="submit-btn" type="submit">Send Quote Request</button>
+            </form>
+          </section>
+        </section>
+
+        <footer class="site-footer"><p>Trusted local contractor service since 2011.</p><p>&copy; <span id="year"></span> Jason's Pro Finish &amp; Solutions</p></footer>
+      </article>
+    </main>
+    <script src="./src/js/main.js"></script>
+  </body>
+</html>

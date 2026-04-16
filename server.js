@@ -12,6 +12,5 @@ app.get("*", (_req, res) => {
 });
 
 app.listen(port, () => {
-  // Keeping this explicit helps during local startup debugging.
   console.log(`Server running at http://localhost:${port}`);
 });

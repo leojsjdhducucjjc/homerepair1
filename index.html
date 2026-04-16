@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Jason's Pro Finish & Solutions</title>
+    <title>Jason's Pro Finish & Solutions | Lake Home Renovation Experts</title>
     <meta
       name="description"
-      content="Professional painting, flooring, power washing, and remodeling for lakefront homes."
+      content="Professional painting, flooring, power washing, and remodeling for lakefront homes around Lake of the Ozarks."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -19,23 +19,33 @@
   <body>
     <main class="page-wrap">
       <article class="flyer" aria-label="Jason's Pro Finish & Solutions website">
-        <header class="top-header">
+        <div class="sticky-nav-shell">
+<header class="top-header">
           <div class="brand-block">
-            <img
+            <a class="brand-home-link" href="./index.html" aria-label="Go to Home"><img
               class="brand-logo"
               src="./assets/header-logo.png"
               alt="Jason's Pro Finish and Solutions logo"
-            />
+            /></a>
             <div>
               <p class="brand-title">Jason's</p>
               <p class="brand-sub">PRO FINISH & SOLUTIONS</p>
             </div>
           </div>
-          <div class="header-actions">
-            <a class="btn btn-orange" href="#quote">Get a Free Quote</a>
-            <a class="btn btn-blue" href="tel:+15735550000">Call Now</a>
+</header>
+<nav class="page-nav" aria-label="Primary">
+          <div class="nav-row nav-row-main">
+            <a class="active" href="./index.html">Home</a>
+            <a href="./services.html">Services</a>
+            <a href="./testimonials.html">Testimonials</a>
           </div>
-        </header>
+          <div class="nav-row nav-row-secondary">
+            <a href="./gallery.html">Before &amp; After</a>
+            <a href="./service-areas.html">Service Areas</a>
+          </div>
+          <a class="nav-quote" href="./contact.html">Free Quote</a>
+        </nav>
+        </div>
 
         <p class="mini-strip">Reliable Work for Lakefront Homes</p>
 
@@ -47,9 +57,16 @@
             alt="Professional finishes for lakefront living banner"
           />
           <div class="hero-cta">
-            <a class="btn btn-orange" href="#quote">Get a Free Quote</a>
-            <a class="btn btn-blue" href="tel:+15735550000">Call Now</a>
+            <a class="btn btn-orange" href="./contact.html">Get a Free Quote</a>
+            <a class="btn btn-blue" href="tel:+15735002002">Call Now</a>
           </div>
+        </section>
+
+        <section class="trust-strip" aria-label="Trust highlights">
+          <div class="trust-item"><strong>Licensed</strong> Lake-area compliant projects</div>
+          <div class="trust-item"><strong>Insured</strong> Residential protection on every job</div>
+          <div class="trust-item"><strong>Warranty</strong> Workmanship warranty included</div>
+          <div class="trust-item"><strong>Fast Scheduling</strong> Clear start dates and timelines</div>
         </section>
 
         <section class="section-block" id="services">
@@ -63,6 +80,9 @@
                 alt="Interior painting service living room"
                 loading="lazy"
               />
+              <div class="mini-cta">
+                <a class="secondary" href="./interior-painting.html">See Details</a>
+              </div>
             </article>
             <article class="service-card">
               <h3>Luxury Flooring</h3>
@@ -72,15 +92,21 @@
                 alt="Luxury flooring service example"
                 loading="lazy"
               />
+              <div class="mini-cta">
+                <a class="secondary" href="./luxury-flooring.html">See Details</a>
+              </div>
             </article>
             <article class="service-card">
               <h3>Power Washing</h3>
               <p>Deck, Dock, &amp; Siding</p>
               <img
-                src="./assets/power-washing.png"
+                src="./assets/power-washing-home-card.png"
                 alt="Power washing service for docks, decks, and siding"
                 loading="lazy"
               />
+              <div class="mini-cta">
+                <a class="secondary" href="./power-washing.html">See Details</a>
+              </div>
             </article>
             <article class="service-card">
               <h3>Bathroom &amp; Kitchen Remodels</h3>
@@ -90,7 +116,39 @@
                 alt="Bathroom and kitchen remodel service example"
                 loading="lazy"
               />
+              <div class="mini-cta">
+                <a class="secondary" href="./bathroom-kitchen-remodels.html">See Details</a>
+              </div>
             </article>
+          </div>
+        </section>
+
+        <section class="difference-section" id="before-after" aria-label="Before and after results">
+          <div class="difference-inner">
+            <h2>See The Difference for Yourself</h2>
+            <div class="difference-grid">
+              <article class="difference-card">
+                <img
+                  src="./assets/before-after-bedroom.png"
+                  alt="Bedroom remodel before and after comparison"
+                  loading="lazy"
+                />
+              </article>
+              <article class="difference-card">
+                <img
+                  src="./assets/before-after-bathroom.png"
+                  alt="Bathroom remodel before and after comparison"
+                  loading="lazy"
+                />
+              </article>
+              <article class="difference-card">
+                <img
+                  src="./assets/before-after-power-washing.png"
+                  alt="Siding power washing before and after comparison"
+                  loading="lazy"
+                />
+              </article>
+            </div>
           </div>
         </section>
 
@@ -114,9 +172,7 @@
 
               <article class="testimonial-card">
                 <p class="stars" aria-label="5 out of 5 stars">&#9733; &#9733; &#9733; &#9733; &#9733;</p>
-                <p class="quote">
-                  "The entire process was smooth and fast. I highly recommend them."
-                </p>
+                <p class="quote">"The entire process was smooth and fast. I highly recommend them."</p>
                 <div class="person-row">
                   <div class="person-meta">
                     <p class="name">Sarah R.</p>
@@ -143,41 +199,16 @@
           </div>
         </section>
 
-        <section class="difference-section" id="before-after" aria-label="Before and after results">
-          <div class="difference-inner">
-            <h2>See The Difference for Yourself</h2>
-            <div class="difference-grid">
-              <article class="difference-card">
-                <img
-                  src="./assets/before-after-bedroom.png"
-                  alt="Bedroom remodel before and after comparison"
-                  loading="lazy"
-                />
-              </article>
-              <article class="difference-card">
-                <img
-                  src="./assets/before-after-bathroom.png"
-                  alt="Shower remodel before and after comparison"
-                  loading="lazy"
-                />
-              </article>
-              <article class="difference-card">
-                <img
-                  src="./assets/before-after-power-washing.png"
-                  alt="Power washing siding before and after comparison"
-                  loading="lazy"
-                />
-              </article>
-            </div>
-          </div>
-        </section>
+        <div class="licensed-banner">
+          Licensed and insured. Warranty-backed work. Free written estimates.
+        </div>
 
         <section class="bottom-cta" id="quote">
           <h2>Get Your Lake Home Ready for the Season</h2>
           <div class="bottom-buttons">
-            <a class="btn btn-orange" href="tel:+15735550000">Call Now</a>
-            <a class="btn btn-blue" href="mailto:quote@jasonsprofinish.com">Request a Quote</a>
-            <a class="btn btn-orange" href="sms:+15735550000">Text Us</a>
+            <a class="btn btn-orange" href="tel:+15735002002">Call Now</a>
+            <a class="btn btn-blue" href="./contact.html">Request a Quote</a>
+            <a class="btn btn-orange" href="sms:+15735002002">Text Us</a>
           </div>
         </section>
 
