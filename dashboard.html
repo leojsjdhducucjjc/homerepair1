@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Owner Dashboard | Jason's Lake Ozarks Pro Painting and Remodeling</title>
+    <meta name="description" content="Owner dashboard for viewing free quote requests." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./src/css/styles.css" />
+  </head>
+  <body class="dashboard-page">
+    <main class="page-wrap">
+      <article class="flyer">
+        <div class="sticky-nav-shell">
+          <header class="top-header">
+            <div class="brand-block">
+              <a class="brand-home-link" href="./index.html" aria-label="Go to Home"><img class="brand-logo" src="./assets/header-logo.png" alt="Jason's Lake Ozarks Pro Painting and Remodeling logo" /></a>
+            </div>
+          </header>
+        </div>
+
+        <section class="page-hero">
+          <h1>Owner Dashboard</h1>
+          <p>Review incoming free quote requests in one place.</p>
+        </section>
+
+        <section class="page-content">
+          <article class="content-card dashboard-shell">
+            <div class="dashboard-toolbar">
+              <div>
+                <h2>Quote Requests</h2>
+                <p id="dashboard-summary">Loading requests...</p>
+              </div>
+              <div class="dashboard-actions">
+                <a class="dashboard-home-link" href="./contact.html">Open Quote Form</a>
+                <a class="dashboard-secondary-link" href="./reset-password">Reset Password</a>
+                <form action="/auth/logout" method="post">
+                  <button class="dashboard-logout" type="submit">Log Out</button>
+                </form>
+              </div>
+            </div>
+
+            <p class="dashboard-status" id="dashboard-status" role="status"></p>
+            <div class="dashboard-empty" id="dashboard-empty" hidden>No quote requests yet. New form submissions will show up here.</div>
+            <div class="dashboard-grid" id="dashboard-grid"></div>
+          </article>
+        </section>
+
+        <footer class="site-footer"><p>Owner-only dashboard.</p><p>&copy; <span id="year"></span> Jason's Lake Ozarks Pro Painting and Remodeling</p></footer>
+      </article>
+    </main>
+    <script src="./src/js/main.js"></script>
+  </body>
+</html>
