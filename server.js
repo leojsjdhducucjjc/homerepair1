@@ -190,9 +190,13 @@ app.use((_req, res) => {
   res.status(404).send("Not found");
 });
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`Server running at http://localhost:${port}`);
+  });
+}
+
+module.exports = app;
 
 function loadEnvFile() {
   const envPath = path.join(__dirname, ".env");
