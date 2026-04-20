@@ -688,6 +688,64 @@ body.nav-hidden .sticky-nav-shell {
   letter-spacing: 0.01em;
 }
 
+.brands-section {
+  padding: 0.9rem 0.72rem 1rem;
+  background: linear-gradient(180deg, #f8fbff 0%, #eff5ff 100%);
+  border-top: 1px solid #d8e4f1;
+  border-bottom: 1px solid #d8e4f1;
+}
+
+.brands-section h2 {
+  margin: 0 0 0.78rem;
+  text-align: center;
+  color: #123d6f;
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-size: clamp(1.5rem, 2.9vw, 2.1rem);
+  line-height: 1;
+}
+
+.brand-category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.72rem;
+}
+
+.brand-category-card {
+  border: 1px solid #d4e1f0;
+  border-radius: 14px;
+  background: #fff;
+  padding: 0.82rem;
+  box-shadow: 0 10px 22px rgba(16, 36, 61, 0.05);
+}
+
+.brand-category-card h3 {
+  margin: 0 0 0.55rem;
+  color: #18497f;
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.brand-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.48rem;
+}
+
+.brand-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0.42rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid #d4e1f0;
+  background: linear-gradient(180deg, #f9fbff 0%, #edf5ff 100%);
+  color: #214d83;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
 .quote-process {
   padding: 0.95rem 0.72rem 1.05rem;
   background: linear-gradient(180deg, #fef6ed 0%, #fff9f2 100%);
@@ -1390,6 +1448,10 @@ body.nav-hidden .sticky-nav-shell {
   }
 
   .quote-process-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-category-grid {
     grid-template-columns: 1fr;
   }
 
