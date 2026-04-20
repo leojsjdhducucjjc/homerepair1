@@ -1232,6 +1232,26 @@ body.nav-hidden .sticky-nav-shell {
   border: 1px solid #c8d8ec;
 }
 
+.dashboard-danger-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.84rem;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  border: 1px solid #b93a3a;
+  background: linear-gradient(180deg, #d55353 0%, #a92e2e 100%);
+  cursor: pointer;
+}
+
+.dashboard-danger-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .dashboard-actions {
   display: flex;
   align-items: center;
@@ -1274,6 +1294,28 @@ body.nav-hidden .sticky-nav-shell {
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
   box-shadow: 0 10px 24px rgba(20, 44, 74, 0.07);
   padding: 1rem;
+}
+
+.request-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.9rem;
+}
+
+.request-delete-btn {
+  border: 1px solid #e3bcbc;
+  background: #fff3f3;
+  color: #a92e2e;
+  font-weight: 800;
+  font-size: 0.82rem;
+  padding: 0.6rem 0.95rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.request-delete-btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .request-card-head {

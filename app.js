@@ -280,6 +280,68 @@ app.get("/api/quote-requests", requireAuthenticatedApi, async (_req, res) => {
   res.json({ requests });
 });
 
+app.delete("/api/quote-requests/:requestId", requireAuthenticatedApi, async (req, res) => {
+  const requestId = cleanValue(req.params.requestId);
+
+  if (!requestId) {
+    return res.status(400).json({ error: "A request id is required." });
+  }
+
+  const { data: existingRequest, error: findError } = await supabase
+    .from("quote_requests")
+    .select("id")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (findError) {
+    console.error("Failed to find quote request for deletion", findError);
+    return res.status(500).json({ error: "We could not delete that request right now." });
+  }
+
+  if (!existingRequest) {
+    return res.status(404).json({ error: "That request no longer exists." });
+  }
+
+  await deleteStoredAttachments(requestId);
+  cleanupRequestAttachments(requestId);
+
+  const { error } = await supabase.from("quote_requests").delete().eq("id", requestId);
+
+  if (error) {
+    console.error("Failed to delete quote request", error);
+    return res.status(500).json({ error: "We could not delete that request right now." });
+  }
+
+  res.json({ success: true });
+});
+
+app.delete("/api/quote-requests", requireAuthenticatedApi, async (_req, res) => {
+  const { data, error: loadError } = await supabase.from("quote_requests").select("id");
+
+  if (loadError) {
+    console.error("Failed to load quote requests for bulk deletion", loadError);
+    return res.status(500).json({ error: "We could not clear the requests right now." });
+  }
+
+  const requestIds = (data || [])
+    .map((request) => cleanValue(request.id))
+    .filter(Boolean);
+
+  for (const requestId of requestIds) {
+    await deleteStoredAttachments(requestId);
+    cleanupRequestAttachments(requestId);
+  }
+
+  const { error } = await supabase.from("quote_requests").delete().neq("id", "");
+
+  if (error) {
+    console.error("Failed to clear quote requests", error);
+    return res.status(500).json({ error: "We could not clear the requests right now." });
+  }
+
+  res.json({ success: true, deleted: requestIds.length });
+});
+
 app.use("/quote-attachments", express.static(attachmentsRoot));
 app.use(express.static(rootDir));
 

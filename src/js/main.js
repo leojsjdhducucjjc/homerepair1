@@ -103,6 +103,7 @@ if (dashboardGrid) {
   const dashboardStatus = document.getElementById("dashboard-status");
   const dashboardSummary = document.getElementById("dashboard-summary");
   const dashboardEmpty = document.getElementById("dashboard-empty");
+  const clearAllButton = document.getElementById("dashboard-clear-all");
 
   const loadRequests = async () => {
     try {
@@ -139,6 +140,10 @@ if (dashboardGrid) {
       }
 
       dashboardGrid.innerHTML = requests.map(renderRequestCard).join("");
+
+      if (clearAllButton) {
+        clearAllButton.disabled = requests.length === 0;
+      }
     } catch (error) {
       if (dashboardStatus) {
         dashboardStatus.textContent = error.message || "We could not load quote requests.";
@@ -147,8 +152,121 @@ if (dashboardGrid) {
       if (dashboardSummary) {
         dashboardSummary.textContent = "Requests unavailable right now.";
       }
+
+      if (clearAllButton) {
+        clearAllButton.disabled = true;
+      }
     }
   };
+
+  dashboardGrid.addEventListener("click", async (event) => {
+    const deleteButton = event.target.closest("[data-delete-request]");
+
+    if (!deleteButton) {
+      return;
+    }
+
+    const requestId = deleteButton.getAttribute("data-delete-request") || "";
+    const requestName = deleteButton.getAttribute("data-request-name") || "this request";
+
+    if (!requestId) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete ${requestName}? This cannot be undone.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteButton.disabled = true;
+
+    if (dashboardStatus) {
+      dashboardStatus.textContent = "Deleting request...";
+    }
+
+    try {
+      const response = await fetch(`/api/quote-requests/${encodeURIComponent(requestId)}`, {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error || "We could not delete that request.");
+      }
+
+      if (dashboardStatus) {
+        dashboardStatus.textContent = "Request deleted.";
+      }
+
+      await loadRequests();
+    } catch (error) {
+      if (dashboardStatus) {
+        dashboardStatus.textContent = error.message || "We could not delete that request.";
+      }
+
+      deleteButton.disabled = false;
+    }
+  });
+
+  if (clearAllButton) {
+    clearAllButton.addEventListener("click", async () => {
+      const confirmed = window.confirm(
+        "Delete all quote requests? This will permanently remove every response and attachment."
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      clearAllButton.disabled = true;
+
+      if (dashboardStatus) {
+        dashboardStatus.textContent = "Deleting all requests...";
+      }
+
+      try {
+        const response = await fetch("/api/quote-requests", {
+          method: "DELETE",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        const result = await response.json().catch(() => ({}));
+
+        if (response.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(result.error || "We could not clear the requests.");
+        }
+
+        if (dashboardStatus) {
+          dashboardStatus.textContent = "All requests deleted.";
+        }
+
+        await loadRequests();
+      } catch (error) {
+        if (dashboardStatus) {
+          dashboardStatus.textContent = error.message || "We could not clear the requests.";
+        }
+
+        clearAllButton.disabled = false;
+      }
+    });
+  }
 
   loadRequests();
 }
@@ -215,6 +333,16 @@ function renderRequestCard(request) {
       <div class="request-details">
         <h4>Project Details</h4>
         <p>${escapeHtml(request.details || "No project details were added.")}</p>
+      </div>
+      <div class="request-card-actions">
+        <button
+          class="request-delete-btn"
+          type="button"
+          data-delete-request="${escapeHtmlAttr(request.id || "")}"
+          data-request-name="${escapeHtmlAttr(request.name || "this request")}"
+        >
+          Delete Request
+        </button>
       </div>
     </article>
   `;
