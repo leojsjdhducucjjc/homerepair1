@@ -12,6 +12,7 @@ const app = express();
 const rootDir = __dirname;
 const legacyRequestsFile = path.join(rootDir, "data", "quote-requests.json");
 const attachmentsRoot = getAttachmentsRoot();
+const attachmentsBucket = process.env.SUPABASE_ATTACHMENTS_BUCKET || "quote-attachments";
 const sessionTtlHours = Number(process.env.SESSION_TTL_HOURS) || 24;
 const sessionTtlSeconds = sessionTtlHours * 60 * 60;
 const sessionCookieName = "dashboard_session";
@@ -209,7 +210,18 @@ app.post("/api/quote-requests", (req, res) => {
       return res.status(500).json({ error: "We could not save your quote request right now." });
     }
 
-    const attachments = saveRequestAttachmentMetadata(entry.id, req.files || []);
+    let attachments = [];
+
+    try {
+      attachments = await saveRequestAttachments(entry.id, req.files || []);
+    } catch (attachmentError) {
+      await supabase.from("quote_requests").delete().eq("id", entry.id);
+      console.error("Failed to save quote request attachments", attachmentError);
+      cleanupRequestAttachments(req.uploadRequestId);
+      return res.status(500).json({
+        error: "We could not finish uploading the attached files. Please try again.",
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -250,18 +262,20 @@ app.get("/api/quote-requests", requireAuthenticatedApi, async (_req, res) => {
     return res.status(500).json({ error: "We could not load quote requests right now." });
   }
 
-  const requests = (data || []).map((request) => ({
-    id: request.id,
-    submittedAt: request.submitted_at,
-    name: request.name,
-    phone: request.phone,
-    email: request.email,
-    city: request.city,
-    service: request.service,
-    timeline: request.timeline,
-    details: request.details,
-    attachments: loadRequestAttachments(request.id),
-  }));
+  const requests = await Promise.all(
+    (data || []).map(async (request) => ({
+      id: request.id,
+      submittedAt: request.submitted_at,
+      name: request.name,
+      phone: request.phone,
+      email: request.email,
+      city: request.city,
+      service: request.service,
+      timeline: request.timeline,
+      details: request.details,
+      attachments: await loadRequestAttachments(request.id),
+    }))
+  );
 
   res.json({ requests });
 });
@@ -292,6 +306,7 @@ async function initializeDataLayer() {
 
   try {
     await seedOwnerUser();
+    await ensureAttachmentsBucket();
     await migrateLegacyQuoteRequests();
     await purgeExpiredSessions();
     dataLayerState.ready = true;
@@ -410,6 +425,37 @@ async function seedOwnerUser() {
 
   if (error) {
     throw new Error(`Supabase owner seed failed: ${error.message}`);
+  }
+}
+
+async function ensureAttachmentsBucket() {
+  const { data, error } = await supabase.storage.listBuckets();
+
+  if (error) {
+    throw new Error(`Supabase storage is unavailable: ${error.message}`);
+  }
+
+  if ((data || []).some((bucket) => bucket.name === attachmentsBucket)) {
+    return;
+  }
+
+  const { error: createError } = await supabase.storage.createBucket(attachmentsBucket, {
+    public: false,
+    fileSizeLimit: 10 * 1024 * 1024,
+    allowedMimeTypes: [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/gif",
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+    ],
+  });
+
+  if (createError && !String(createError.message || "").toLowerCase().includes("already exists")) {
+    throw new Error(`Supabase attachments bucket setup failed: ${createError.message}`);
   }
 }
 
@@ -661,27 +707,64 @@ function isAllowedAttachment(file) {
   return allowedMimeTypes.has(file.mimetype) || allowedExtensions.has(extension);
 }
 
-function saveRequestAttachmentMetadata(requestId, files) {
+async function saveRequestAttachments(requestId, files) {
   if (!Array.isArray(files) || files.length === 0) {
     cleanupRequestAttachments(requestId, { removeDirectoryIfEmpty: true });
     return [];
   }
 
-  const requestDir = path.join(attachmentsRoot, requestId);
   const attachments = files.map((file) => ({
     originalName: cleanValue(file.originalname) || file.filename,
     storedName: file.filename,
     size: Number(file.size) || 0,
-    url: `/quote-attachments/${encodeURIComponent(requestId)}/${encodeURIComponent(file.filename)}`,
+    contentType: cleanValue(file.mimetype) || "application/octet-stream",
   }));
 
-  fs.writeFileSync(path.join(requestDir, "attachments.json"), JSON.stringify(attachments, null, 2));
-  return attachments;
+  try {
+    for (const file of files) {
+      const storagePath = getAttachmentStoragePath(requestId, file.filename);
+      const buffer = fs.readFileSync(file.path);
+      const { error } = await supabase.storage.from(attachmentsBucket).upload(storagePath, buffer, {
+        contentType: file.mimetype || "application/octet-stream",
+        upsert: true,
+      });
+
+      if (error) {
+        throw new Error(error.message || "Attachment upload failed.");
+      }
+    }
+
+    const manifestPath = getAttachmentManifestPath(requestId);
+    const manifestBuffer = Buffer.from(JSON.stringify(attachments, null, 2), "utf8");
+    const { error: manifestError } = await supabase.storage
+      .from(attachmentsBucket)
+      .upload(manifestPath, manifestBuffer, {
+        contentType: "application/json",
+        upsert: true,
+      });
+
+    if (manifestError) {
+      throw new Error(manifestError.message || "Attachment manifest upload failed.");
+    }
+
+    return await buildSignedAttachments(requestId, attachments);
+  } catch (error) {
+    await deleteStoredAttachments(requestId);
+    throw error;
+  } finally {
+    cleanupRequestAttachments(requestId);
+  }
 }
 
-function loadRequestAttachments(requestId) {
+async function loadRequestAttachments(requestId) {
   if (!requestId) {
     return [];
+  }
+
+  const storedAttachments = await loadStoredAttachments(requestId);
+
+  if (storedAttachments.length > 0) {
+    return storedAttachments;
   }
 
   const metadataPath = path.join(attachmentsRoot, requestId, "attachments.json");
@@ -696,6 +779,103 @@ function loadRequestAttachments(requestId) {
   } catch (error) {
     console.error("Failed to read attachment metadata", error);
     return [];
+  }
+}
+
+async function loadStoredAttachments(requestId) {
+  try {
+    const manifest = await loadAttachmentManifest(requestId);
+
+    if (!Array.isArray(manifest) || manifest.length === 0) {
+      return [];
+    }
+
+    return await buildSignedAttachments(requestId, manifest);
+  } catch (error) {
+    console.error("Failed to load stored attachments", error);
+    return [];
+  }
+}
+
+async function loadAttachmentManifest(requestId) {
+  const { data, error } = await supabase.storage
+    .from(attachmentsBucket)
+    .download(getAttachmentManifestPath(requestId));
+
+  if (error) {
+    const lowerMessage = String(error.message || "").toLowerCase();
+    if (lowerMessage.includes("not found") || lowerMessage.includes("404")) {
+      return [];
+    }
+
+    console.error("Failed to load attachment manifest", error);
+    return [];
+  }
+
+  try {
+    const contents = await readStorageBodyAsString(data);
+    const manifest = JSON.parse(contents);
+    return Array.isArray(manifest) ? manifest : [];
+  } catch (manifestError) {
+    console.error("Failed to parse attachment manifest", manifestError);
+    return [];
+  }
+}
+
+async function buildSignedAttachments(requestId, manifest) {
+  if (!Array.isArray(manifest) || manifest.length === 0) {
+    return [];
+  }
+
+  const paths = manifest.map((attachment) =>
+    getAttachmentStoragePath(requestId, attachment.storedName)
+  );
+  const { data, error } = await supabase.storage
+    .from(attachmentsBucket)
+    .createSignedUrls(paths, 60 * 60);
+
+  if (error) {
+    throw new Error(error.message || "Could not create attachment URLs.");
+  }
+
+  const urlByPath = new Map((data || []).map((entry) => [entry.path, entry.signedUrl || ""]));
+
+  return manifest
+    .map((attachment) => {
+      const storagePath = getAttachmentStoragePath(requestId, attachment.storedName);
+      const signedUrl = urlByPath.get(storagePath);
+
+      if (!signedUrl) {
+        return null;
+      }
+
+      return {
+        originalName: cleanValue(attachment.originalName) || attachment.storedName,
+        storedName: cleanValue(attachment.storedName),
+        size: Number(attachment.size) || 0,
+        contentType: cleanValue(attachment.contentType),
+        url: signedUrl,
+      };
+    })
+    .filter(Boolean);
+}
+
+async function deleteStoredAttachments(requestId) {
+  if (!requestId) {
+    return;
+  }
+
+  const manifest = await loadAttachmentManifest(requestId);
+  const paths = manifest
+    .map((attachment) => getAttachmentStoragePath(requestId, attachment.storedName))
+    .filter(Boolean);
+
+  paths.push(getAttachmentManifestPath(requestId));
+
+  const { error } = await supabase.storage.from(attachmentsBucket).remove(paths);
+
+  if (error) {
+    console.error("Failed to delete stored attachments", error);
   }
 }
 
@@ -723,6 +903,31 @@ function cleanupRequestAttachments(requestId, options = {}) {
 
 function cleanValue(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getAttachmentManifestPath(requestId) {
+  return `${requestId}/attachments.json`;
+}
+
+function getAttachmentStoragePath(requestId, storedName) {
+  return `${requestId}/${cleanValue(storedName)}`;
+}
+
+async function readStorageBodyAsString(body) {
+  if (!body) {
+    return "";
+  }
+
+  if (typeof body.text === "function") {
+    return body.text();
+  }
+
+  if (typeof body.arrayBuffer === "function") {
+    const buffer = Buffer.from(await body.arrayBuffer());
+    return buffer.toString("utf8");
+  }
+
+  return Buffer.from(body).toString("utf8");
 }
 
 function createRequestId() {
