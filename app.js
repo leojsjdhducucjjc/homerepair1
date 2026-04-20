@@ -739,7 +739,7 @@ async function saveRequestAttachments(requestId, files) {
     const { error: manifestError } = await supabase.storage
       .from(attachmentsBucket)
       .upload(manifestPath, manifestBuffer, {
-        contentType: "application/json",
+        contentType: "text/plain",
         upsert: true,
       });
 
