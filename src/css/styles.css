@@ -1366,6 +1366,7 @@ body.nav-hidden .sticky-nav-shell {
 }
 
 .attachment-list {
+  margin-top: 0.7rem;
   margin: 0;
   padding-left: 1.1rem;
   color: #34506f;
@@ -1383,6 +1384,38 @@ body.nav-hidden .sticky-nav-shell {
 
 .attachment-list a:hover {
   text-decoration: underline;
+}
+
+.attachment-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.7rem;
+}
+
+.attachment-preview-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.attachment-preview-image {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  border-radius: 12px;
+  border: 1px solid #d4e1f0;
+  background: #eef5ff;
+  box-shadow: 0 10px 22px rgba(16, 36, 61, 0.08);
+}
+
+.attachment-preview-caption {
+  display: block;
+  margin-top: 0.38rem;
+  color: #315177;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .login-content {

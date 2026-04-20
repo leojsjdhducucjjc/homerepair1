@@ -225,24 +225,69 @@ function renderAttachmentList(attachments) {
     return "";
   }
 
+  const imageAttachments = attachments.filter(isImageAttachment);
+  const fileAttachments = attachments.filter((attachment) => !isImageAttachment(attachment));
+
   return `
     <div class="request-details request-attachments">
       <h4>Attached Files</h4>
-      <ul class="attachment-list">
-        ${attachments
-          .map(
-            (attachment) => `
-              <li>
-                <a href="${escapeHtmlAttr(attachment.url || "#")}" target="_blank" rel="noreferrer">
-                  ${escapeHtml(attachment.originalName || "Attachment")}
-                </a>
-              </li>
-            `
-          )
-          .join("")}
-      </ul>
+      ${imageAttachments.length > 0 ? renderAttachmentPreviewGrid(imageAttachments) : ""}
+      ${fileAttachments.length > 0 ? renderAttachmentFileList(fileAttachments) : ""}
     </div>
   `;
+}
+
+function renderAttachmentPreviewGrid(attachments) {
+  return `
+    <div class="attachment-preview-grid">
+      ${attachments
+        .map(
+          (attachment) => `
+            <a
+              class="attachment-preview-link"
+              href="${escapeHtmlAttr(attachment.url || "#")}"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <img
+                class="attachment-preview-image"
+                src="${escapeHtmlAttr(attachment.url || "#")}"
+                alt="${escapeHtmlAttr(attachment.originalName || "Attached image")}"
+                loading="lazy"
+              />
+              <span class="attachment-preview-caption">${escapeHtml(attachment.originalName || "Attached image")}</span>
+            </a>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderAttachmentFileList(attachments) {
+  return `
+    <ul class="attachment-list">
+      ${attachments
+        .map(
+          (attachment) => `
+            <li>
+              <a href="${escapeHtmlAttr(attachment.url || "#")}" target="_blank" rel="noreferrer">
+                ${escapeHtml(attachment.originalName || "Attachment")}
+              </a>
+            </li>
+          `
+        )
+        .join("")}
+    </ul>
+  `;
+}
+
+function isImageAttachment(attachment) {
+  const url = String(attachment?.url || "").toLowerCase();
+  const name = String(attachment?.originalName || "").toLowerCase();
+  return [".jpg", ".jpeg", ".png", ".webp", ".gif"].some(
+    (extension) => url.endsWith(extension) || name.endsWith(extension)
+  );
 }
 
 function escapeHtml(value) {
