@@ -117,6 +117,18 @@
                 <textarea id="message" name="details" placeholder="Tell us what you want updated."></textarea>
               </div>
 
+              <div>
+                <label for="attachments">Photos or Files</label>
+                <input
+                  id="attachments"
+                  name="attachments"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx,.txt"
+                  multiple
+                />
+                <p class="input-help">Attach up to 5 photos or files. Images, PDFs, and common document types are supported.</p>
+              </div>
+
               <p class="form-status" data-form-status role="status" aria-live="polite"></p>
               <button class="submit-btn" type="submit">Send Quote Request</button>
             </form>

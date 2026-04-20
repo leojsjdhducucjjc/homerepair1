@@ -55,7 +55,6 @@ if (quoteForm) {
     event.preventDefault();
 
     const formData = new FormData(quoteForm);
-    const payload = Object.fromEntries(formData.entries());
 
     if (formStatus) {
       formStatus.textContent = "Sending your request...";
@@ -70,10 +69,7 @@ if (quoteForm) {
     try {
       const response = await fetch("/api/quote-requests", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       const result = await response.json().catch(() => ({}));
@@ -212,14 +208,40 @@ function renderRequestCard(request) {
       <dl class="request-meta">
         <div><dt>Phone</dt><dd><a href="tel:${escapeHtmlAttr(request.phone || "")}">${escapeHtml(request.phone || "Not provided")}</a></dd></div>
         <div><dt>Email</dt><dd><a href="mailto:${escapeHtmlAttr(request.email || "")}">${escapeHtml(request.email || "Not provided")}</a></dd></div>
-        <div><dt>City / Area</dt><dd>${escapeHtml(request.city || "Not provided")}</dd></div>
-        <div><dt>Timeline</dt><dd>${escapeHtml(request.timeline || "Not provided")}</dd></div>
+      <div><dt>City / Area</dt><dd>${escapeHtml(request.city || "Not provided")}</dd></div>
+      <div><dt>Timeline</dt><dd>${escapeHtml(request.timeline || "Not provided")}</dd></div>
       </dl>
+      ${renderAttachmentList(request.attachments)}
       <div class="request-details">
         <h4>Project Details</h4>
         <p>${escapeHtml(request.details || "No project details were added.")}</p>
       </div>
     </article>
+  `;
+}
+
+function renderAttachmentList(attachments) {
+  if (!Array.isArray(attachments) || attachments.length === 0) {
+    return "";
+  }
+
+  return `
+    <div class="request-details request-attachments">
+      <h4>Attached Files</h4>
+      <ul class="attachment-list">
+        ${attachments
+          .map(
+            (attachment) => `
+              <li>
+                <a href="${escapeHtmlAttr(attachment.url || "#")}" target="_blank" rel="noreferrer">
+                  ${escapeHtml(attachment.originalName || "Attachment")}
+                </a>
+              </li>
+            `
+          )
+          .join("")}
+      </ul>
+    </div>
   `;
 }
 

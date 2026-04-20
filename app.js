@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
+const multer = require("multer");
 const { createClient } = require("@supabase/supabase-js");
 
 loadEnvFile();
@@ -9,6 +10,7 @@ loadEnvFile();
 const app = express();
 const rootDir = __dirname;
 const legacyRequestsFile = path.join(rootDir, "data", "quote-requests.json");
+const attachmentsRoot = path.join(rootDir, "data", "quote-attachments");
 const sessionTtlHours = Number(process.env.SESSION_TTL_HOURS) || 24;
 const sessionTtlSeconds = sessionTtlHours * 60 * 60;
 const sessionCookieName = "dashboard_session";
@@ -32,6 +34,43 @@ const dataLayerState = {
 };
 
 const dataLayerReadyPromise = initializeDataLayer();
+
+fs.mkdirSync(attachmentsRoot, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination(req, _file, cb) {
+      const requestId = req.uploadRequestId || createRequestId();
+      req.uploadRequestId = requestId;
+      const requestDir = path.join(attachmentsRoot, requestId);
+      fs.mkdirSync(requestDir, { recursive: true });
+      cb(null, requestDir);
+    },
+    filename(_req, file, cb) {
+      const originalName = cleanValue(file.originalname) || "attachment";
+      const extension = path.extname(originalName).slice(0, 12).toLowerCase();
+      const basename = path
+        .basename(originalName, extension)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 48) || "attachment";
+      cb(null, `${Date.now().toString(36)}-${basename}${extension}`);
+    },
+  }),
+  limits: {
+    files: 5,
+    fileSize: 10 * 1024 * 1024,
+  },
+  fileFilter(_req, file, cb) {
+    if (isAllowedAttachment(file)) {
+      cb(null, true);
+      return;
+    }
+
+    cb(new Error("Unsupported file type. Please upload images, PDFs, or common document files."));
+  },
+});
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
@@ -126,45 +165,66 @@ app.post("/auth/reset-password", requireAuthenticatedPage, async (req, res) => {
   res.redirect("/reset-password?success=1");
 });
 
-app.post("/api/quote-requests", async (req, res) => {
-  if (!(await ensureDataLayerReady())) {
-    return res.status(503).json({
-      error: "Quote request storage is not configured yet. Add Supabase environment variables first.",
+app.post("/api/quote-requests", (req, res) => {
+  req.uploadRequestId = createRequestId();
+
+  upload.array("attachments", 5)(req, res, async (uploadError) => {
+    if (uploadError) {
+      cleanupRequestAttachments(req.uploadRequestId);
+      const message =
+        uploadError.code === "LIMIT_FILE_SIZE"
+          ? "Each file must be 10MB or smaller."
+          : uploadError.code === "LIMIT_FILE_COUNT"
+            ? "You can upload up to 5 files per request."
+            : uploadError.message || "We could not upload your attachments.";
+      return res.status(400).json({ error: message });
+    }
+
+    if (!(await ensureDataLayerReady())) {
+      cleanupRequestAttachments(req.uploadRequestId);
+      return res.status(503).json({
+        error: "Quote request storage is not configured yet. Add Supabase environment variables first.",
+      });
+    }
+
+    const payload = normalizeRequest(req.body);
+
+    if (!payload.name || !payload.phone || !payload.email || !payload.city || !payload.service) {
+      cleanupRequestAttachments(req.uploadRequestId);
+      return res.status(400).json({ error: "Please fill out all required fields." });
+    }
+
+    const entry = {
+      id: req.uploadRequestId,
+      submitted_at: new Date().toISOString(),
+      ...payload,
+    };
+
+    const { error } = await supabase.from("quote_requests").insert(entry);
+
+    if (error) {
+      cleanupRequestAttachments(req.uploadRequestId);
+      console.error("Failed to save quote request", error);
+      return res.status(500).json({ error: "We could not save your quote request right now." });
+    }
+
+    const attachments = saveRequestAttachmentMetadata(entry.id, req.files || []);
+
+    res.status(201).json({
+      success: true,
+      request: {
+        id: entry.id,
+        submittedAt: entry.submitted_at,
+        name: entry.name,
+        phone: entry.phone,
+        email: entry.email,
+        city: entry.city,
+        service: entry.service,
+        timeline: entry.timeline,
+        details: entry.details,
+        attachments,
+      },
     });
-  }
-
-  const payload = normalizeRequest(req.body);
-
-  if (!payload.name || !payload.phone || !payload.email || !payload.city || !payload.service) {
-    return res.status(400).json({ error: "Please fill out all required fields." });
-  }
-
-  const entry = {
-    id: createRequestId(),
-    submitted_at: new Date().toISOString(),
-    ...payload,
-  };
-
-  const { error } = await supabase.from("quote_requests").insert(entry);
-
-  if (error) {
-    console.error("Failed to save quote request", error);
-    return res.status(500).json({ error: "We could not save your quote request right now." });
-  }
-
-  res.status(201).json({
-    success: true,
-    request: {
-      id: entry.id,
-      submittedAt: entry.submitted_at,
-      name: entry.name,
-      phone: entry.phone,
-      email: entry.email,
-      city: entry.city,
-      service: entry.service,
-      timeline: entry.timeline,
-      details: entry.details,
-    },
   });
 });
 
@@ -199,11 +259,13 @@ app.get("/api/quote-requests", requireAuthenticatedApi, async (_req, res) => {
     service: request.service,
     timeline: request.timeline,
     details: request.details,
+    attachments: loadRequestAttachments(request.id),
   }));
 
   res.json({ requests });
 });
 
+app.use("/quote-attachments", express.static(attachmentsRoot));
 app.use(express.static(rootDir));
 
 app.get("/", (_req, res) => {
@@ -580,6 +642,82 @@ function normalizeRequest(body) {
     timeline: cleanValue(body.timeline),
     details: cleanValue(body.details),
   };
+}
+
+function isAllowedAttachment(file) {
+  const allowedMimeTypes = new Set([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+  ]);
+  const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf", ".doc", ".docx", ".txt"]);
+  const extension = path.extname(file.originalname || "").toLowerCase();
+  return allowedMimeTypes.has(file.mimetype) || allowedExtensions.has(extension);
+}
+
+function saveRequestAttachmentMetadata(requestId, files) {
+  if (!Array.isArray(files) || files.length === 0) {
+    cleanupRequestAttachments(requestId, { removeDirectoryIfEmpty: true });
+    return [];
+  }
+
+  const requestDir = path.join(attachmentsRoot, requestId);
+  const attachments = files.map((file) => ({
+    originalName: cleanValue(file.originalname) || file.filename,
+    storedName: file.filename,
+    size: Number(file.size) || 0,
+    url: `/quote-attachments/${encodeURIComponent(requestId)}/${encodeURIComponent(file.filename)}`,
+  }));
+
+  fs.writeFileSync(path.join(requestDir, "attachments.json"), JSON.stringify(attachments, null, 2));
+  return attachments;
+}
+
+function loadRequestAttachments(requestId) {
+  if (!requestId) {
+    return [];
+  }
+
+  const metadataPath = path.join(attachmentsRoot, requestId, "attachments.json");
+
+  if (!fs.existsSync(metadataPath)) {
+    return [];
+  }
+
+  try {
+    const data = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Failed to read attachment metadata", error);
+    return [];
+  }
+}
+
+function cleanupRequestAttachments(requestId, options = {}) {
+  if (!requestId) {
+    return;
+  }
+
+  const requestDir = path.join(attachmentsRoot, requestId);
+
+  if (!fs.existsSync(requestDir)) {
+    return;
+  }
+
+  const entries = fs.readdirSync(requestDir);
+
+  for (const entry of entries) {
+    fs.rmSync(path.join(requestDir, entry), { force: true, recursive: true });
+  }
+
+  if (options.removeDirectoryIfEmpty !== false) {
+    fs.rmSync(requestDir, { force: true, recursive: true });
+  }
 }
 
 function cleanValue(value) {

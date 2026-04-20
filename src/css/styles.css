@@ -1136,6 +1136,13 @@ body.nav-hidden .sticky-nav-shell {
   background: #fff;
 }
 
+.input-help {
+  margin: 0.32rem 0 0;
+  color: #506b88;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .contact-form textarea {
   min-height: 120px;
   resize: vertical;
@@ -1356,6 +1363,26 @@ body.nav-hidden .sticky-nav-shell {
   color: #34506f;
   line-height: 1.55;
   white-space: pre-wrap;
+}
+
+.attachment-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #34506f;
+}
+
+.attachment-list li + li {
+  margin-top: 0.3rem;
+}
+
+.attachment-list a {
+  color: #1e5a98;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.attachment-list a:hover {
+  text-decoration: underline;
 }
 
 .login-content {
