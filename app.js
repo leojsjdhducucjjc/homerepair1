@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const express = require("express");
 const multer = require("multer");
@@ -10,7 +11,7 @@ loadEnvFile();
 const app = express();
 const rootDir = __dirname;
 const legacyRequestsFile = path.join(rootDir, "data", "quote-requests.json");
-const attachmentsRoot = path.join(rootDir, "data", "quote-attachments");
+const attachmentsRoot = getAttachmentsRoot();
 const sessionTtlHours = Number(process.env.SESSION_TTL_HOURS) || 24;
 const sessionTtlSeconds = sessionTtlHours * 60 * 60;
 const sessionCookieName = "dashboard_session";
@@ -726,4 +727,12 @@ function cleanValue(value) {
 
 function createRequestId() {
   return `qr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getAttachmentsRoot() {
+  if (process.env.VERCEL) {
+    return path.join(os.tmpdir(), "homerepair-quote-attachments");
+  }
+
+  return path.join(rootDir, "data", "quote-attachments");
 }
