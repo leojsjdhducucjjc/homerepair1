@@ -173,7 +173,9 @@ if (dashboardGrid) {
       return;
     }
 
-    const confirmed = window.confirm(`Delete ${requestName}? This cannot be undone.`);
+    const confirmed = await showDashboardConfirm(
+      `Delete ${requestName}? This cannot be undone.`
+    );
 
     if (!confirmed) {
       return;
@@ -220,7 +222,7 @@ if (dashboardGrid) {
 
   if (clearAllButton) {
     clearAllButton.addEventListener("click", async () => {
-      const confirmed = window.confirm(
+      const confirmed = await showDashboardConfirm(
         "Delete all quote requests? This will permanently remove every response and attachment."
       );
 
@@ -429,6 +431,52 @@ function escapeHtml(value) {
 
 function escapeHtmlAttr(value) {
   return escapeHtml(value).replaceAll("`", "&#96;");
+}
+
+function showDashboardConfirm(message) {
+  const modal = document.getElementById("dashboard-confirm");
+  const messageEl = document.getElementById("dashboard-confirm-message");
+  const okButton = document.getElementById("dashboard-confirm-ok");
+  const cancelButton = document.getElementById("dashboard-confirm-cancel");
+
+  if (!modal || !messageEl || !okButton || !cancelButton) {
+    return Promise.resolve(window.confirm(message));
+  }
+
+  messageEl.textContent = message;
+  modal.hidden = false;
+  document.body.classList.add("modal-open");
+
+  return new Promise((resolve) => {
+    const cleanup = (result) => {
+      modal.hidden = true;
+      document.body.classList.remove("modal-open");
+      okButton.removeEventListener("click", handleOk);
+      cancelButton.removeEventListener("click", handleCancel);
+      modal.removeEventListener("click", handleBackdrop);
+      document.removeEventListener("keydown", handleKeydown);
+      resolve(result);
+    };
+
+    const handleOk = () => cleanup(true);
+    const handleCancel = () => cleanup(false);
+    const handleBackdrop = (event) => {
+      if (event.target?.matches("[data-confirm-cancel]")) {
+        cleanup(false);
+      }
+    };
+    const handleKeydown = (event) => {
+      if (event.key === "Escape") {
+        cleanup(false);
+      }
+    };
+
+    okButton.addEventListener("click", handleOk);
+    cancelButton.addEventListener("click", handleCancel);
+    modal.addEventListener("click", handleBackdrop);
+    document.addEventListener("keydown", handleKeydown);
+    okButton.focus();
+  });
 }
 
 let googleMapsScriptPromise = null;

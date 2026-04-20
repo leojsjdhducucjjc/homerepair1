@@ -1252,6 +1252,79 @@ body.nav-hidden .sticky-nav-shell {
   opacity: 0.6;
 }
 
+.dashboard-confirm[hidden] {
+  display: none;
+}
+
+.dashboard-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.dashboard-confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 24, 41, 0.58);
+  backdrop-filter: blur(3px);
+}
+
+.dashboard-confirm-card {
+  position: relative;
+  width: min(460px, 100%);
+  border-radius: 24px;
+  border: 1px solid #d5e1ef;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  box-shadow: 0 28px 60px rgba(14, 34, 59, 0.22);
+  padding: 1.35rem;
+}
+
+.dashboard-confirm-card h2 {
+  margin: 0 0 0.45rem;
+  color: #163f70;
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-size: 2rem;
+}
+
+.dashboard-confirm-card p {
+  margin: 0;
+  color: #315177;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.dashboard-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.dashboard-confirm-cancel,
+.dashboard-confirm-ok {
+  min-width: 120px;
+  border-radius: 999px;
+  padding: 0.85rem 1.05rem;
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.dashboard-confirm-cancel {
+  border: 1px solid #c9d9ec;
+  background: #edf4ff;
+  color: #28558b;
+}
+
+.dashboard-confirm-ok {
+  border: 1px solid #25579a;
+  background: linear-gradient(180deg, #4d7fc5 0%, #2c5da2 100%);
+  color: #fff;
+}
+
 .dashboard-actions {
   display: flex;
   align-items: center;

@@ -52,6 +52,18 @@
         <footer class="site-footer"><p>Owner-only dashboard.</p><p>&copy; <span id="year"></span> Jason's Lake Ozarks Pro Painting and Remodeling</p></footer>
       </article>
     </main>
+
+    <div class="dashboard-confirm" id="dashboard-confirm" hidden>
+      <div class="dashboard-confirm-backdrop" data-confirm-cancel></div>
+      <div class="dashboard-confirm-card" role="dialog" aria-modal="true" aria-labelledby="dashboard-confirm-title">
+        <h2 id="dashboard-confirm-title">Please Confirm</h2>
+        <p id="dashboard-confirm-message">Are you sure?</p>
+        <div class="dashboard-confirm-actions">
+          <button class="dashboard-confirm-cancel" id="dashboard-confirm-cancel" type="button">Cancel</button>
+          <button class="dashboard-confirm-ok" id="dashboard-confirm-ok" type="button">Confirm</button>
+        </div>
+      </div>
+    </div>
     <script src="./src/js/main.js"></script>
   </body>
 </html>

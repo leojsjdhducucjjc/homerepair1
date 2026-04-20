@@ -219,7 +219,7 @@ app.post("/api/quote-requests", (req, res) => {
       console.error("Failed to save quote request attachments", attachmentError);
       cleanupRequestAttachments(req.uploadRequestId);
       return res.status(500).json({
-        error: "We could not finish uploading the attached files. Please try again.",
+        error: "We had trouble uploading your photo or file. Please try again, or send your request without attachments and we will follow up with you.",
       });
     }
 
