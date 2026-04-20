@@ -747,7 +747,13 @@ async function saveRequestAttachments(requestId, files) {
       throw new Error(manifestError.message || "Attachment manifest upload failed.");
     }
 
-    return await buildSignedAttachments(requestId, attachments);
+    return attachments.map((attachment) => ({
+      originalName: cleanValue(attachment.originalName) || attachment.storedName,
+      storedName: cleanValue(attachment.storedName),
+      size: Number(attachment.size) || 0,
+      contentType: cleanValue(attachment.contentType),
+      url: "",
+    }));
   } catch (error) {
     await deleteStoredAttachments(requestId);
     throw error;
