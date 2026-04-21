@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Contact & Free Quote | Jason's Pro Finish & Solutions</title>
+    <title>Contact & Free Quote | Jason's Lake Ozarks Pro Painting and Remodeling</title>
     <meta name="description" content="Request a free quote for interior painting, flooring, power washing, and remodeling projects." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,8 +16,8 @@
         <div class="sticky-nav-shell">
 <header class="top-header">
           <div class="brand-block">
-            <a class="brand-home-link" href="./index.html" aria-label="Go to Home"><img class="brand-logo" src="./assets/header-logo.png" alt="Jason's Pro Finish and Solutions logo" /></a>
-            <div><p class="brand-title">Jason's</p><p class="brand-sub">PRO FINISH & SOLUTIONS</p></div>
+            <a class="brand-home-link" href="./index.html" aria-label="Go to Home"><img class="brand-logo" src="./assets/header-logo.png" alt="Jason's Lake Ozarks Pro Painting and Remodeling logo" /></a>
+            <div><p class="brand-title">Jason's</p><p class="brand-sub">LAKE OZARKS PRO PAINTING &amp; REMODELING</p></div>
           </div>
 </header>
 <nav class="page-nav" aria-label="Primary">
@@ -26,9 +26,10 @@
             <a class="active" href="./services.html">Services</a>
             <a href="./testimonials.html">Testimonials</a>
           </div>
-          <div class="nav-row nav-row-secondary">
+          <div class="nav-row nav-row-secondary nav-row-tertiary">
             <a href="./gallery.html">Before &amp; After</a>
             <a href="./service-areas.html">Service Areas</a>
+            <a href="./blog.html">Blog</a>
           </div>
           <a class="nav-quote" href="./contact.html">Free Quote</a>
         </nav>
@@ -62,33 +63,41 @@
 
           <section class="content-card">
             <h2>Request Form</h2>
-            <form class="contact-form" action="mailto:jasonslakeozarkspropainting@gmail.com" method="post" enctype="text/plain">
+            <form class="contact-form" data-quote-form>
               <div class="form-row">
                 <div>
                   <label for="name">Full Name</label>
-                  <input id="name" name="Full Name" type="text" required />
+                  <input id="name" name="name" type="text" autocomplete="name" required />
                 </div>
                 <div>
                   <label for="phone">Phone Number</label>
-                  <input id="phone" name="Phone" type="tel" required />
+                  <input id="phone" name="phone" type="tel" autocomplete="tel" required />
                 </div>
               </div>
 
               <div class="form-row">
                 <div>
                   <label for="email">Email</label>
-                  <input id="email" name="Email" type="email" required />
+                  <input id="email" name="email" type="email" autocomplete="email" required />
                 </div>
                 <div>
-                  <label for="city">City / Area</label>
-                  <input id="city" name="City" type="text" required />
+                  <label for="city">Property Address / Area</label>
+                  <input
+                    id="city"
+                    name="city"
+                    type="text"
+                    autocomplete="street-address"
+                    placeholder="Start typing the property address"
+                    data-address-input
+                    required
+                  />
                 </div>
               </div>
 
               <div class="form-row">
                 <div>
                   <label for="service">Service Needed</label>
-                  <select id="service" name="Service" required>
+                  <select id="service" name="service" required>
                     <option value="">Select a service</option>
                     <option>Interior Painting</option>
                     <option>Luxury Flooring</option>
@@ -99,21 +108,34 @@
                 </div>
                 <div>
                   <label for="timeline">Target Timeline</label>
-                  <input id="timeline" name="Timeline" type="text" placeholder="Example: Next month" />
+                  <input id="timeline" name="timeline" type="text" placeholder="Example: Next month" />
                 </div>
               </div>
 
               <div>
                 <label for="message">Project Details</label>
-                <textarea id="message" name="Project Details" placeholder="Tell us what you want updated."></textarea>
+                <textarea id="message" name="details" placeholder="Tell us what you want updated."></textarea>
               </div>
 
+              <div>
+                <label for="attachments">Photos or Files</label>
+                <input
+                  id="attachments"
+                  name="attachments"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx,.txt"
+                  multiple
+                />
+                <p class="input-help">Attach up to 5 photos or files. Images, PDFs, and common document types are supported.</p>
+              </div>
+
+              <p class="form-status" data-form-status role="status" aria-live="polite"></p>
               <button class="submit-btn" type="submit">Send Quote Request</button>
             </form>
           </section>
         </section>
 
-        <footer class="site-footer"><p>Trusted local contractor service since 2011.</p><p>&copy; <span id="year"></span> Jason's Pro Finish &amp; Solutions</p></footer>
+        <footer class="site-footer"><p>Trusted local contractor service for Lake of the Ozarks homes.</p><p>&copy; <span id="year"></span> Jason's Lake Ozarks Pro Painting and Remodeling</p></footer>
       </article>
     </main>
     <script src="./src/js/main.js"></script>

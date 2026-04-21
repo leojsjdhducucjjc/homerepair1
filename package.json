@@ -10,6 +10,8 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "@supabase/supabase-js": "^2.103.2",
+    "express": "^4.21.2",
+    "multer": "^2.0.2"
   }
 }
