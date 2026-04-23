@@ -235,9 +235,11 @@ app.post("/api/quote-requests", (req, res) => {
       });
     }
 
-    sendQuoteNotification(entry, attachments).catch((emailError) => {
+    try {
+      await sendQuoteNotification(entry, attachments);
+    } catch (emailError) {
       console.error("Failed to send quote request notification email", emailError);
-    });
+    }
 
     res.status(201).json({
       success: true,
@@ -1000,13 +1002,22 @@ async function deleteStoredAttachments(requestId) {
 }
 
 async function sendQuoteNotification(request, attachments = []) {
-  if (!resend || !quoteNotificationFrom) {
+  if (!resend) {
+    console.warn("Quote notification email skipped: RESEND_API_KEY is not configured.");
+    return;
+  }
+
+  if (!quoteNotificationFrom) {
+    console.warn("Quote notification email skipped: QUOTE_NOTIFICATION_FROM is not configured.");
     return;
   }
 
   const recipients = await getQuoteNotificationRecipients();
 
   if (recipients.length === 0) {
+    console.warn(
+      "Quote notification email skipped: no recipient emails found in users.email or QUOTE_NOTIFICATION_TO."
+    );
     return;
   }
 
