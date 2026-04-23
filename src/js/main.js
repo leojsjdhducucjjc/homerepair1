@@ -384,6 +384,8 @@ if (navShell) {
   const root = document.documentElement;
   let lastScrollY = window.scrollY;
   let ticking = false;
+  const toggleDelta = 8;
+  const bottomLockOffset = 2;
 
   const updateNavHeight = () => {
     root.style.setProperty("--nav-shell-height", `${navShell.offsetHeight}px`);
@@ -400,12 +402,20 @@ if (navShell) {
       ticking = true;
       window.requestAnimationFrame(() => {
         const currentY = window.scrollY;
+        const maxScrollY = document.documentElement.scrollHeight - window.innerHeight;
+        const isNearPageBottom = maxScrollY - currentY <= bottomLockOffset;
+
+        if (isNearPageBottom) {
+          lastScrollY = currentY;
+          ticking = false;
+          return;
+        }
 
         if (currentY <= 20) {
           document.body.classList.remove("nav-hidden");
-        } else if (currentY > lastScrollY + 8) {
+        } else if (currentY > lastScrollY + toggleDelta) {
           document.body.classList.add("nav-hidden");
-        } else if (currentY < lastScrollY - 8) {
+        } else if (currentY < lastScrollY - toggleDelta) {
           document.body.classList.remove("nav-hidden");
         }
 
