@@ -39,6 +39,7 @@ const supabase = hasSupabaseConfig
 const dataLayerState = {
   ready: false,
   error: hasSupabaseConfig ? null : "Supabase is not configured yet.",
+  userEmailColumnReady: false,
 };
 
 const dataLayerReadyPromise = initializeDataLayer();
@@ -100,9 +101,9 @@ app.post("/auth/login", async (req, res) => {
     return res.redirect("/login?error=config");
   }
 
-  const username = cleanValue(req.body.username);
+  const login = cleanValue(req.body.username);
   const password = cleanValue(req.body.password);
-  const user = await findUserByUsername(username);
+  const user = await findUserByLogin(login);
 
   if (!user || !verifyPassword(password, user.password_salt, user.password_hash)) {
     return res.redirect("/login?error=invalid");
@@ -377,6 +378,7 @@ async function initializeDataLayer() {
   }
 
   try {
+    await detectUserEmailColumn();
     await seedOwnerUser();
     await ensureAttachmentsBucket();
     await migrateLegacyQuoteRequests();
@@ -472,6 +474,9 @@ async function migrateLegacyQuoteRequests() {
 async function seedOwnerUser() {
   const username = process.env.DASHBOARD_USERNAME || "owner";
   const password = process.env.DASHBOARD_PASSWORD || "change-me";
+  const email = cleanValue(
+    process.env.DASHBOARD_EMAIL || process.env.OWNER_EMAIL || quoteNotificationTo[0] || ""
+  );
 
   const { count, error: countError } = await supabase
     .from("users")
@@ -487,16 +492,33 @@ async function seedOwnerUser() {
 
   const { salt, hash } = createPasswordRecord(password);
   const now = new Date().toISOString();
-  const { error } = await supabase.from("users").insert({
+  const ownerRecord = {
     username,
     password_hash: hash,
     password_salt: salt,
     created_at: now,
     updated_at: now,
-  });
+  };
+
+  if (dataLayerState.userEmailColumnReady && email) {
+    ownerRecord.email = email;
+  }
+
+  const { error } = await supabase.from("users").insert(ownerRecord);
 
   if (error) {
     throw new Error(`Supabase owner seed failed: ${error.message}`);
+  }
+}
+
+async function detectUserEmailColumn() {
+  const { error } = await supabase.from("users").select("email").limit(1);
+  dataLayerState.userEmailColumnReady = !error;
+
+  if (error) {
+    console.warn(
+      "Supabase users.email column is not available yet. Email login and database-based notification recipients will stay disabled until the schema is updated."
+    );
   }
 }
 
@@ -552,23 +574,38 @@ function verifyPassword(password, salt, expectedHash) {
   return crypto.timingSafeEqual(candidateHash, storedHash);
 }
 
-async function findUserByUsername(username) {
-  if (!username) {
+async function findUserByLogin(login) {
+  if (!login) {
     return null;
   }
 
-  const { data, error } = await supabase
+  const { data: usernameUser, error: usernameError } = await supabase
     .from("users")
     .select("id, username, password_hash, password_salt")
-    .eq("username", username)
+    .eq("username", login)
     .maybeSingle();
 
-  if (error) {
-    console.error("Failed to load user by username", error);
+  if (usernameError) {
+    console.error("Failed to load user by username", usernameError);
     return null;
   }
 
-  return data;
+  if (usernameUser || !dataLayerState.userEmailColumnReady) {
+    return usernameUser;
+  }
+
+  const { data: emailUser, error: emailError } = await supabase
+    .from("users")
+    .select("id, username, password_hash, password_salt")
+    .ilike("email", login)
+    .maybeSingle();
+
+  if (emailError) {
+    console.error("Failed to load user by email", emailError);
+    return null;
+  }
+
+  return emailUser;
 }
 
 async function findUserById(userId) {
@@ -958,7 +995,13 @@ async function deleteStoredAttachments(requestId) {
 }
 
 async function sendQuoteNotification(request, attachments = []) {
-  if (!resend || quoteNotificationTo.length === 0 || !quoteNotificationFrom) {
+  if (!resend || !quoteNotificationFrom) {
+    return;
+  }
+
+  const recipients = await getQuoteNotificationRecipients();
+
+  if (recipients.length === 0) {
     return;
   }
 
@@ -990,7 +1033,7 @@ async function sendQuoteNotification(request, attachments = []) {
 
   const { error } = await resend.emails.send({
     from: quoteNotificationFrom,
-    to: quoteNotificationTo,
+    to: recipients,
     subject,
     html,
     text,
@@ -1000,6 +1043,28 @@ async function sendQuoteNotification(request, attachments = []) {
   if (error) {
     throw new Error(error.message || "Resend email failed.");
   }
+}
+
+async function getQuoteNotificationRecipients() {
+  if (!dataLayerState.userEmailColumnReady) {
+    return quoteNotificationTo;
+  }
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("email")
+    .not("email", "is", null);
+
+  if (error) {
+    console.error("Failed to load owner notification emails", error);
+    return quoteNotificationTo;
+  }
+
+  const userEmails = (data || [])
+    .map((user) => cleanValue(user.email))
+    .filter(Boolean);
+
+  return [...new Set([...userEmails, ...quoteNotificationTo])];
 }
 
 function buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl) {
