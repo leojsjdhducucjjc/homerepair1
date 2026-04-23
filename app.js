@@ -17,6 +17,31 @@ const attachmentsBucket = process.env.SUPABASE_ATTACHMENTS_BUCKET || "quote-atta
 const sessionTtlHours = Number(process.env.SESSION_TTL_HOURS) || 24;
 const sessionTtlSeconds = sessionTtlHours * 60 * 60;
 const sessionCookieName = "dashboard_session";
+const allowedAttachmentMimeTypes = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+];
+const allowedAttachmentExtensions = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".gif",
+  ".heic",
+  ".heif",
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".txt",
+]);
 const quoteNotificationTo = parseEmailList(
   process.env.QUOTE_NOTIFICATION_TO || process.env.OWNER_EMAIL || ""
 );
@@ -536,24 +561,29 @@ async function ensureAttachmentsBucket() {
     throw new Error(`Supabase storage is unavailable: ${error.message}`);
   }
 
+  const bucketOptions = {
+    public: false,
+    fileSizeLimit: 10 * 1024 * 1024,
+    allowedMimeTypes: allowedAttachmentMimeTypes,
+  };
+
   if ((data || []).some((bucket) => bucket.name === attachmentsBucket)) {
+    const { error: updateError } = await supabase.storage.updateBucket(
+      attachmentsBucket,
+      bucketOptions
+    );
+
+    if (updateError) {
+      throw new Error(`Supabase attachments bucket update failed: ${updateError.message}`);
+    }
+
     return;
   }
 
-  const { error: createError } = await supabase.storage.createBucket(attachmentsBucket, {
-    public: false,
-    fileSizeLimit: 10 * 1024 * 1024,
-    allowedMimeTypes: [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-      "image/gif",
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "text/plain",
-    ],
-  });
+  const { error: createError } = await supabase.storage.createBucket(
+    attachmentsBucket,
+    bucketOptions
+  );
 
   if (createError && !String(createError.message || "").toLowerCase().includes("already exists")) {
     throw new Error(`Supabase attachments bucket setup failed: ${createError.message}`);
@@ -808,19 +838,36 @@ function normalizeRequest(body) {
 }
 
 function isAllowedAttachment(file) {
-  const allowedMimeTypes = new Set([
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/gif",
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "text/plain",
-  ]);
-  const allowedExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf", ".doc", ".docx", ".txt"]);
   const extension = path.extname(file.originalname || "").toLowerCase();
-  return allowedMimeTypes.has(file.mimetype) || allowedExtensions.has(extension);
+  return (
+    allowedAttachmentMimeTypes.includes(cleanValue(file.mimetype)) ||
+    allowedAttachmentExtensions.has(extension)
+  );
+}
+
+function getAttachmentContentType(file) {
+  const mimeType = cleanValue(file.mimetype);
+
+  if (allowedAttachmentMimeTypes.includes(mimeType)) {
+    return mimeType;
+  }
+
+  const extension = path.extname(file.originalname || file.filename || "").toLowerCase();
+  const contentTypeByExtension = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+    ".pdf": "application/pdf",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".txt": "text/plain",
+  };
+
+  return contentTypeByExtension[extension] || "text/plain";
 }
 
 async function saveRequestAttachments(requestId, files) {
@@ -833,7 +880,7 @@ async function saveRequestAttachments(requestId, files) {
     originalName: cleanValue(file.originalname) || file.filename,
     storedName: file.filename,
     size: Number(file.size) || 0,
-    contentType: cleanValue(file.mimetype) || "application/octet-stream",
+    contentType: getAttachmentContentType(file),
   }));
 
   try {
@@ -841,7 +888,7 @@ async function saveRequestAttachments(requestId, files) {
       const storagePath = getAttachmentStoragePath(requestId, file.filename);
       const buffer = fs.readFileSync(file.path);
       const { error } = await supabase.storage.from(attachmentsBucket).upload(storagePath, buffer, {
-        contentType: file.mimetype || "application/octet-stream",
+        contentType: getAttachmentContentType(file),
         upsert: true,
       });
 
@@ -1022,6 +1069,7 @@ async function sendQuoteNotification(request, attachments = []) {
   }
 
   const dashboardUrl = getDashboardUrl();
+  const logoUrl = getPublicAssetUrl("/assets/header-logo.png");
   const attachmentNames = Array.isArray(attachments)
     ? attachments.map((attachment) => cleanValue(attachment.originalName)).filter(Boolean)
     : [];
@@ -1045,7 +1093,7 @@ async function sendQuoteNotification(request, attachments = []) {
   ]
     .filter((line) => line !== "")
     .join("\n");
-  const html = buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl);
+  const html = buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl, logoUrl);
 
   const emailPayload = {
     from: quoteNotificationFrom,
@@ -1088,7 +1136,7 @@ async function getQuoteNotificationRecipients() {
   return [...new Set([...userEmails, ...quoteNotificationTo])];
 }
 
-function buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl) {
+function buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl, logoUrl) {
   const fields = [
     ["Name", request.name || "Not provided"],
     ["Phone", request.phone || "Not provided"],
@@ -1114,10 +1162,14 @@ function buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl) {
   const dashboardLink = dashboardUrl
     ? `<p style="margin:22px 0 0;"><a href="${escapeHtmlAttr(dashboardUrl)}" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#1d5ea8;color:#ffffff;text-decoration:none;font-weight:700;">Open Dashboard</a></p>`
     : "";
+  const logoMarkup = logoUrl
+    ? `<div style="margin:0 0 18px;text-align:center;"><img src="${escapeHtmlAttr(logoUrl)}" alt="Jason's Lake Ozarks Pro Painting and Remodeling" style="display:inline-block;max-width:260px;width:100%;height:auto;" /></div>`
+    : "";
 
   return `
     <div style="margin:0;padding:24px;background:#eef4fb;font-family:Arial,sans-serif;color:#263c55;">
       <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d8e4f2;border-radius:18px;padding:24px;">
+        ${logoMarkup}
         <p style="margin:0 0 8px;color:#f58220;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">New Website Lead</p>
         <h1 style="margin:0 0 18px;color:#163f70;font-size:28px;line-height:1.15;">Free Quote Request</h1>
         <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">${rows}</table>
@@ -1186,6 +1238,26 @@ function formatSubmittedAt(value) {
 }
 
 function getDashboardUrl() {
+  const siteUrl = getSiteUrl();
+
+  if (!siteUrl) {
+    return "";
+  }
+
+  return `${siteUrl}/dashboard`;
+}
+
+function getPublicAssetUrl(assetPath) {
+  const siteUrl = getSiteUrl();
+
+  if (!siteUrl) {
+    return "";
+  }
+
+  return `${siteUrl}/${cleanValue(assetPath).replace(/^\/+/, "")}`;
+}
+
+function getSiteUrl() {
   const siteUrl =
     cleanValue(process.env.SITE_URL) ||
     cleanValue(process.env.VERCEL_PROJECT_PRODUCTION_URL) ||
@@ -1196,7 +1268,7 @@ function getDashboardUrl() {
   }
 
   const normalizedUrl = /^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`;
-  return `${normalizedUrl.replace(/\/+$/, "")}/dashboard`;
+  return normalizedUrl.replace(/\/+$/, "");
 }
 
 function escapeHtml(value) {
