@@ -1620,11 +1620,22 @@ body.nav-hidden .sticky-nav-shell {
 
 .invoice-history li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 0.6rem;
   align-items: center;
   color: #34506f;
   font-weight: 700;
+}
+
+.invoice-history a {
+  color: #1d5a98;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.invoice-history a:hover {
+  text-decoration: underline;
 }
 
 .invoice-history small {

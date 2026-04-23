@@ -79,8 +79,8 @@
         <div class="invoice-modal-head">
           <div>
             <p class="login-kicker">Customer Invoice</p>
-            <h2 id="invoice-modal-title">Create Invoice</h2>
-            <p id="invoice-customer-summary">Choose services and pricing for this customer.</p>
+            <h2 id="invoice-modal-title">Create Square Payment Link</h2>
+            <p id="invoice-customer-summary">Choose services and pricing, then send a secure Square payment link.</p>
           </div>
           <button class="invoice-modal-close" type="button" data-invoice-close aria-label="Close invoice form">×</button>
         </div>
@@ -89,8 +89,8 @@
 
         <div class="invoice-form-grid">
           <div>
-            <label for="invoice-title">Invoice Title</label>
-            <input id="invoice-title" name="title" type="text" value="Project Invoice" required />
+            <label for="invoice-title">Payment Title</label>
+            <input id="invoice-title" name="title" type="text" value="Project Payment" required />
           </div>
           <div>
             <label for="invoice-due-date">Due Date</label>
@@ -122,7 +122,7 @@
 
         <div class="invoice-modal-actions">
           <button class="dashboard-confirm-cancel" type="button" data-invoice-close>Cancel</button>
-          <button class="dashboard-confirm-ok" id="invoice-submit" type="submit">Send Invoice</button>
+          <button class="dashboard-confirm-ok" id="invoice-submit" type="submit">Send Square Link</button>
         </div>
       </form>
     </div>

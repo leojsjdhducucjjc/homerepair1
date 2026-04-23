@@ -44,9 +44,16 @@ create table if not exists public.invoices (
   total numeric(10, 2) not null default 0,
   due_date date,
   status text not null default 'sent',
+  square_payment_link_id text not null default '',
+  square_payment_link_url text not null default '',
+  square_order_id text not null default '',
   sent_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.invoices add column if not exists square_payment_link_id text not null default '';
+alter table public.invoices add column if not exists square_payment_link_url text not null default '';
+alter table public.invoices add column if not exists square_order_id text not null default '';
 
 create index if not exists sessions_user_id_idx on public.sessions(user_id);
 create index if not exists sessions_expires_at_idx on public.sessions(expires_at);

@@ -46,6 +46,15 @@ const quoteNotificationTo = parseEmailList(
   process.env.QUOTE_NOTIFICATION_TO || process.env.OWNER_EMAIL || ""
 );
 const quoteNotificationFrom = cleanValue(process.env.QUOTE_NOTIFICATION_FROM);
+const squareAccessToken = cleanValue(process.env.SQUARE_ACCESS_TOKEN);
+const squareLocationId = cleanValue(process.env.SQUARE_LOCATION_ID);
+const squareEnvironment = cleanValue(process.env.SQUARE_ENVIRONMENT).toLowerCase() === "sandbox"
+  ? "sandbox"
+  : "production";
+const squareApiBaseUrl =
+  squareEnvironment === "sandbox"
+    ? "https://connect.squareupsandbox.com"
+    : "https://connect.squareup.com";
 const hasSupabaseConfig = Boolean(
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
 );
@@ -330,11 +339,11 @@ app.post("/api/invoices", requireAuthenticatedApi, async (req, res) => {
   const payload = normalizeInvoiceRequest(req.body);
 
   if (!payload.requestId) {
-    return res.status(400).json({ error: "Choose a quote request before sending an invoice." });
+    return res.status(400).json({ error: "Choose a quote request before sending a Square link." });
   }
 
   if (payload.items.length === 0) {
-    return res.status(400).json({ error: "Add at least one invoice line item." });
+    return res.status(400).json({ error: "Add at least one payment line item." });
   }
 
   const { data: quoteRequest, error: requestError } = await supabase
@@ -357,6 +366,17 @@ app.post("/api/invoices", requireAuthenticatedApi, async (req, res) => {
   }
 
   const now = new Date().toISOString();
+  let squarePaymentLink;
+
+  try {
+    squarePaymentLink = await createSquarePaymentLink(payload, quoteRequest);
+  } catch (squareError) {
+    console.error("Failed to create Square payment link", squareError);
+    return res.status(500).json({
+      error: "We could not create the Square payment link. Check the Square environment variables.",
+    });
+  }
+
   const invoice = {
     id: createInvoiceId(),
     quote_request_id: quoteRequest.id,
@@ -368,7 +388,10 @@ app.post("/api/invoices", requireAuthenticatedApi, async (req, res) => {
     subtotal: payload.total,
     total: payload.total,
     due_date: payload.dueDate || null,
-    status: "sent",
+    status: "square_link_created",
+    square_payment_link_id: squarePaymentLink.id,
+    square_payment_link_url: squarePaymentLink.url,
+    square_order_id: squarePaymentLink.orderId,
     sent_at: now,
     created_at: now,
   };
@@ -377,7 +400,7 @@ app.post("/api/invoices", requireAuthenticatedApi, async (req, res) => {
 
   if (insertError) {
     console.error("Failed to save invoice", insertError);
-    return res.status(500).json({ error: "We could not save that invoice right now." });
+    return res.status(500).json({ error: "We could not save that Square payment link right now." });
   }
 
   try {
@@ -388,7 +411,7 @@ app.post("/api/invoices", requireAuthenticatedApi, async (req, res) => {
       .from("invoices")
       .update({ status: "email_failed" })
       .eq("id", invoice.id);
-    return res.status(500).json({ error: "The invoice was saved, but the email did not send." });
+    return res.status(500).json({ error: "The Square link was saved, but the email did not send." });
   }
 
   res.status(201).json({
@@ -587,7 +610,7 @@ async function loadInvoicesByRequestId(requestIds) {
 
   const { data, error } = await supabase
     .from("invoices")
-    .select("id, quote_request_id, title, total, status, due_date, sent_at, created_at")
+    .select("id, quote_request_id, title, total, status, due_date, square_payment_link_url, sent_at, created_at")
     .in("quote_request_id", uniqueRequestIds)
     .order("created_at", { ascending: false });
 
@@ -1248,7 +1271,7 @@ async function sendInvoiceEmail(invoice, quoteRequest) {
 
   const dashboardUrl = getDashboardUrl();
   const logoUrl = getPublicAssetUrl("/assets/header-logo.png");
-  const subject = `${invoice.title || "Project Invoice"} from Jason's Lake Ozarks`;
+  const subject = `${invoice.title || "Project Payment Link"} from Jason's Lake Ozarks`;
   const text = buildInvoiceEmailText(invoice, quoteRequest, dashboardUrl);
   const html = buildInvoiceEmailHtml(invoice, quoteRequest, dashboardUrl, logoUrl);
 
@@ -1265,6 +1288,71 @@ async function sendInvoiceEmail(invoice, quoteRequest) {
   }
 }
 
+async function createSquarePaymentLink(invoicePayload, quoteRequest) {
+  if (!squareAccessToken) {
+    throw new Error("SQUARE_ACCESS_TOKEN is not configured.");
+  }
+
+  if (!squareLocationId) {
+    throw new Error("SQUARE_LOCATION_ID is not configured.");
+  }
+
+  const amountCents = Math.round(Number(invoicePayload.total || 0) * 100);
+
+  if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    throw new Error("Square payment amount must be greater than zero.");
+  }
+
+  const response = await fetch(`${squareApiBaseUrl}/v2/online-checkout/payment-links`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${squareAccessToken}`,
+      "Content-Type": "application/json",
+      "Square-Version": "2024-12-18",
+    },
+    body: JSON.stringify({
+      idempotency_key: createIdempotencyKey(),
+      quick_pay: {
+        name: invoicePayload.title || `Project payment for ${quoteRequest.name || "customer"}`,
+        price_money: {
+          amount: amountCents,
+          currency: "USD",
+        },
+        location_id: squareLocationId,
+      },
+      checkout_options: {
+        ask_for_shipping_address: false,
+      },
+      pre_populated_data: {
+        buyer_email: quoteRequest.email,
+      },
+      payment_note: `Quote request ${quoteRequest.id} - ${quoteRequest.service || "Project"}`,
+    }),
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const message =
+      Array.isArray(result.errors) && result.errors.length > 0
+        ? result.errors.map((error) => error.detail || error.code).filter(Boolean).join("; ")
+        : "Square payment link request failed.";
+    throw new Error(message);
+  }
+
+  const paymentLink = result.payment_link || {};
+
+  if (!paymentLink.url) {
+    throw new Error("Square did not return a payment link URL.");
+  }
+
+  return {
+    id: paymentLink.id || "",
+    url: paymentLink.url,
+    orderId: paymentLink.order_id || "",
+  };
+}
+
 function buildInvoiceEmailText(invoice, quoteRequest, dashboardUrl) {
   const lineItems = getInvoiceLineItemsFromRecord(invoice)
     .map((item) => `- ${item.description}: ${formatCurrency(item.amount)}`)
@@ -1273,15 +1361,16 @@ function buildInvoiceEmailText(invoice, quoteRequest, dashboardUrl) {
   return [
     `Hi ${quoteRequest.name || "there"},`,
     "",
-    `Here is your invoice from Jason's Lake Ozarks Pro Painting and Remodeling.`,
+    `Here is your Square payment link from Jason's Lake Ozarks Pro Painting and Remodeling.`,
     "",
-    `Invoice: ${invoice.title || "Project Invoice"}`,
+    `Payment Request: ${invoice.title || "Project Payment"}`,
     invoice.due_date ? `Due Date: ${invoice.due_date}` : "",
     "",
     "Line Items:",
     lineItems,
     "",
     `Total: ${formatCurrency(invoice.total)}`,
+    invoice.square_payment_link_url ? `Pay securely with Square: ${invoice.square_payment_link_url}` : "",
     invoice.notes ? `\nNotes:\n${invoice.notes}` : "",
     dashboardUrl ? `\nQuestions? You can reply to this email or contact us from ${dashboardUrl.replace(/\/dashboard$/, "")}.` : "",
   ]
@@ -1307,14 +1396,17 @@ function buildInvoiceEmailHtml(invoice, quoteRequest, dashboardUrl, logoUrl) {
   const notesMarkup = invoice.notes
     ? `<h2 style="margin:22px 0 8px;color:#163f70;font-size:18px;">Notes</h2><p style="margin:0;white-space:pre-wrap;line-height:1.55;">${escapeHtml(invoice.notes)}</p>`
     : "";
+  const paymentButton = invoice.square_payment_link_url
+    ? `<p style="margin:24px 0 0;text-align:center;"><a href="${escapeHtmlAttr(invoice.square_payment_link_url)}" style="display:inline-block;padding:14px 24px;border-radius:999px;background:#1d5ea8;color:#ffffff;text-decoration:none;font-weight:800;">Pay Securely With Square</a></p>`
+    : "";
 
   return `
     <div style="margin:0;padding:24px;background:#eef4fb;font-family:Arial,sans-serif;color:#263c55;">
       <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d8e4f2;border-radius:18px;padding:24px;">
         ${logoMarkup}
-        <p style="margin:0 0 8px;color:#f58220;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">Invoice</p>
-        <h1 style="margin:0 0 10px;color:#163f70;font-size:28px;line-height:1.15;">${escapeHtml(invoice.title || "Project Invoice")}</h1>
-        <p style="margin:0 0 18px;line-height:1.55;">Hi ${escapeHtml(quoteRequest.name || "there")}, here is your invoice for your ${escapeHtml(quoteRequest.service || "project")} request.</p>
+        <p style="margin:0 0 8px;color:#f58220;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">Square Payment Link</p>
+        <h1 style="margin:0 0 10px;color:#163f70;font-size:28px;line-height:1.15;">${escapeHtml(invoice.title || "Project Payment")}</h1>
+        <p style="margin:0 0 18px;line-height:1.55;">Hi ${escapeHtml(quoteRequest.name || "there")}, here is your secure Square payment link for your ${escapeHtml(quoteRequest.service || "project")} request.</p>
         ${invoice.due_date ? `<p style="margin:0 0 18px;"><strong>Due date:</strong> ${escapeHtml(invoice.due_date)}</p>` : ""}
         <table style="width:100%;border-collapse:collapse;margin-top:12px;border:1px solid #d8e4f2;">
           <thead>
@@ -1332,8 +1424,9 @@ function buildInvoiceEmailHtml(invoice, quoteRequest, dashboardUrl, logoUrl) {
           </tfoot>
         </table>
         ${notesMarkup}
+        ${paymentButton}
         <p style="margin:24px 0 0;color:#34506f;line-height:1.55;">Questions? Reply to this email and we will help.</p>
-        ${dashboardUrl ? `<p style="margin:8px 0 0;color:#7890aa;font-size:12px;">Invoice created from the owner dashboard.</p>` : ""}
+        ${dashboardUrl ? `<p style="margin:8px 0 0;color:#7890aa;font-size:12px;">Payment link created from the owner dashboard.</p>` : ""}
       </div>
     </div>
   `;
@@ -1542,6 +1635,10 @@ function createInvoiceId() {
   return `inv_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function createIdempotencyKey() {
+  return crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex");
+}
+
 function serializeInvoice(invoice) {
   return {
     id: invoice.id,
@@ -1549,6 +1646,7 @@ function serializeInvoice(invoice) {
     title: invoice.title,
     total: Number(invoice.total) || 0,
     status: invoice.status,
+    paymentUrl: invoice.square_payment_link_url,
     dueDate: invoice.due_date,
     sentAt: invoice.sent_at,
     createdAt: invoice.created_at,

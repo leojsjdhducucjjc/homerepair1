@@ -318,14 +318,14 @@ if (dashboardGrid) {
 
       if (items.length === 0) {
         if (invoiceStatus) {
-          invoiceStatus.textContent = "Add at least one invoice line item.";
+          invoiceStatus.textContent = "Add at least one payment line item.";
           invoiceStatus.dataset.state = "error";
         }
         return;
       }
 
       if (invoiceStatus) {
-        invoiceStatus.textContent = "Sending invoice...";
+        invoiceStatus.textContent = "Sending Square payment link...";
         invoiceStatus.dataset.state = "pending";
       }
 
@@ -352,11 +352,11 @@ if (dashboardGrid) {
         }
 
         if (!response.ok) {
-          throw new Error(result.error || "We could not send that invoice.");
+          throw new Error(result.error || "We could not send that Square payment link.");
         }
 
         if (invoiceStatus) {
-          invoiceStatus.textContent = "Invoice sent.";
+          invoiceStatus.textContent = "Square payment link sent.";
           invoiceStatus.dataset.state = "success";
         }
 
@@ -364,13 +364,13 @@ if (dashboardGrid) {
         window.setTimeout(closeInvoiceModal, 700);
       } catch (error) {
         if (invoiceStatus) {
-          invoiceStatus.textContent = error.message || "We could not send that invoice.";
+          invoiceStatus.textContent = error.message || "We could not send that Square payment link.";
           invoiceStatus.dataset.state = "error";
         }
       } finally {
         if (invoiceSubmit) {
           invoiceSubmit.disabled = false;
-          invoiceSubmit.textContent = "Send Invoice";
+          invoiceSubmit.textContent = "Send Square Link";
         }
       }
     });
@@ -449,7 +449,7 @@ function renderRequestCard(request) {
           type="button"
           data-create-invoice="${escapeHtmlAttr(request.id || "")}"
         >
-          Create Invoice
+          Create Square Link
         </button>
         <button
           class="request-delete-btn"
@@ -471,14 +471,19 @@ function renderInvoiceSummary(invoices) {
 
   return `
     <div class="request-details invoice-history">
-      <h4>Invoices Sent</h4>
+      <h4>Square Links Sent</h4>
       <ul>
         ${invoices
           .map(
             (invoice) => `
               <li>
-                <span>${escapeHtml(invoice.title || "Invoice")}</span>
+                <span>${escapeHtml(invoice.title || "Payment Link")}</span>
                 <strong>${formatMoney(invoice.total || 0)}</strong>
+                ${
+                  invoice.paymentUrl
+                    ? `<a href="${escapeHtmlAttr(invoice.paymentUrl)}" target="_blank" rel="noreferrer">Open Square Link</a>`
+                    : ""
+                }
                 <small>${escapeHtml(invoice.sentAt ? new Date(invoice.sentAt).toLocaleString() : "Sent")}</small>
               </li>
             `
@@ -530,7 +535,7 @@ function closeInvoiceModal() {
 
   if (invoiceSubmit) {
     invoiceSubmit.disabled = false;
-    invoiceSubmit.textContent = "Send Invoice";
+    invoiceSubmit.textContent = "Send Square Link";
   }
 
   document.body.classList.remove("modal-open");
