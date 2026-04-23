@@ -305,6 +305,8 @@ app.get("/api/quote-requests", requireAuthenticatedApi, async (_req, res) => {
     return res.status(500).json({ error: "We could not load quote requests right now." });
   }
 
+  const requestIds = (data || []).map((request) => request.id);
+  const invoicesByRequestId = await loadInvoicesByRequestId(requestIds);
   const requests = await Promise.all(
     (data || []).map(async (request) => ({
       id: request.id,
@@ -317,10 +319,82 @@ app.get("/api/quote-requests", requireAuthenticatedApi, async (_req, res) => {
       timeline: request.timeline,
       details: request.details,
       attachments: await loadRequestAttachments(request.id),
+      invoices: invoicesByRequestId.get(request.id) || [],
     }))
   );
 
   res.json({ requests });
+});
+
+app.post("/api/invoices", requireAuthenticatedApi, async (req, res) => {
+  const payload = normalizeInvoiceRequest(req.body);
+
+  if (!payload.requestId) {
+    return res.status(400).json({ error: "Choose a quote request before sending an invoice." });
+  }
+
+  if (payload.items.length === 0) {
+    return res.status(400).json({ error: "Add at least one invoice line item." });
+  }
+
+  const { data: quoteRequest, error: requestError } = await supabase
+    .from("quote_requests")
+    .select("id, name, phone, email, city, service, timeline, details")
+    .eq("id", payload.requestId)
+    .maybeSingle();
+
+  if (requestError) {
+    console.error("Failed to load quote request for invoice", requestError);
+    return res.status(500).json({ error: "We could not load that quote request right now." });
+  }
+
+  if (!quoteRequest) {
+    return res.status(404).json({ error: "That quote request no longer exists." });
+  }
+
+  if (!isValidEmail(quoteRequest.email)) {
+    return res.status(400).json({ error: "The customer does not have a valid email address." });
+  }
+
+  const now = new Date().toISOString();
+  const invoice = {
+    id: createInvoiceId(),
+    quote_request_id: quoteRequest.id,
+    customer_name: quoteRequest.name,
+    customer_email: quoteRequest.email,
+    title: payload.title || "Project Invoice",
+    notes: payload.notes,
+    line_items: payload.items,
+    subtotal: payload.total,
+    total: payload.total,
+    due_date: payload.dueDate || null,
+    status: "sent",
+    sent_at: now,
+    created_at: now,
+  };
+
+  const { error: insertError } = await supabase.from("invoices").insert(invoice);
+
+  if (insertError) {
+    console.error("Failed to save invoice", insertError);
+    return res.status(500).json({ error: "We could not save that invoice right now." });
+  }
+
+  try {
+    await sendInvoiceEmail(invoice, quoteRequest);
+  } catch (emailError) {
+    console.error("Failed to send invoice email", emailError);
+    await supabase
+      .from("invoices")
+      .update({ status: "email_failed" })
+      .eq("id", invoice.id);
+    return res.status(500).json({ error: "The invoice was saved, but the email did not send." });
+  }
+
+  res.status(201).json({
+    success: true,
+    invoice: serializeInvoice(invoice),
+  });
 });
 
 app.delete("/api/quote-requests/:requestId", requireAuthenticatedApi, async (req, res) => {
@@ -501,6 +575,35 @@ async function migrateLegacyQuoteRequests() {
   if (error) {
     throw new Error(`Supabase quote-request migration failed: ${error.message}`);
   }
+}
+
+async function loadInvoicesByRequestId(requestIds) {
+  const uniqueRequestIds = [...new Set((requestIds || []).filter(Boolean))];
+  const invoicesByRequestId = new Map();
+
+  if (uniqueRequestIds.length === 0) {
+    return invoicesByRequestId;
+  }
+
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("id, quote_request_id, title, total, status, due_date, sent_at, created_at")
+    .in("quote_request_id", uniqueRequestIds)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Failed to load invoices", error);
+    return invoicesByRequestId;
+  }
+
+  for (const invoice of data || []) {
+    const requestId = invoice.quote_request_id;
+    const invoices = invoicesByRequestId.get(requestId) || [];
+    invoices.push(serializeInvoice(invoice));
+    invoicesByRequestId.set(requestId, invoices);
+  }
+
+  return invoicesByRequestId;
 }
 
 async function seedOwnerUser() {
@@ -837,6 +940,26 @@ function normalizeRequest(body) {
   };
 }
 
+function normalizeInvoiceRequest(body) {
+  const items = Array.isArray(body.items)
+    ? body.items
+        .map((item) => ({
+          description: cleanValue(item.description),
+          amount: Math.round(Number(item.amount || 0) * 100) / 100,
+        }))
+        .filter((item) => item.description && Number.isFinite(item.amount) && item.amount > 0)
+    : [];
+
+  return {
+    requestId: cleanValue(body.requestId),
+    title: cleanValue(body.title) || "Project Invoice",
+    dueDate: cleanValue(body.dueDate),
+    notes: cleanValue(body.notes),
+    items,
+    total: Math.round(items.reduce((sum, item) => sum + item.amount, 0) * 100) / 100,
+  };
+}
+
 function isAllowedAttachment(file) {
   const extension = path.extname(file.originalname || "").toLowerCase();
   return (
@@ -1114,6 +1237,108 @@ async function sendQuoteNotification(request, attachments = []) {
   }
 }
 
+async function sendInvoiceEmail(invoice, quoteRequest) {
+  if (!resend) {
+    throw new Error("RESEND_API_KEY is not configured.");
+  }
+
+  if (!quoteNotificationFrom) {
+    throw new Error("QUOTE_NOTIFICATION_FROM is not configured.");
+  }
+
+  const dashboardUrl = getDashboardUrl();
+  const logoUrl = getPublicAssetUrl("/assets/header-logo.png");
+  const subject = `${invoice.title || "Project Invoice"} from Jason's Lake Ozarks`;
+  const text = buildInvoiceEmailText(invoice, quoteRequest, dashboardUrl);
+  const html = buildInvoiceEmailHtml(invoice, quoteRequest, dashboardUrl, logoUrl);
+
+  const { error } = await resend.emails.send({
+    from: quoteNotificationFrom,
+    to: quoteRequest.email,
+    subject,
+    html,
+    text,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Resend invoice email failed.");
+  }
+}
+
+function buildInvoiceEmailText(invoice, quoteRequest, dashboardUrl) {
+  const lineItems = getInvoiceLineItemsFromRecord(invoice)
+    .map((item) => `- ${item.description}: ${formatCurrency(item.amount)}`)
+    .join("\n");
+
+  return [
+    `Hi ${quoteRequest.name || "there"},`,
+    "",
+    `Here is your invoice from Jason's Lake Ozarks Pro Painting and Remodeling.`,
+    "",
+    `Invoice: ${invoice.title || "Project Invoice"}`,
+    invoice.due_date ? `Due Date: ${invoice.due_date}` : "",
+    "",
+    "Line Items:",
+    lineItems,
+    "",
+    `Total: ${formatCurrency(invoice.total)}`,
+    invoice.notes ? `\nNotes:\n${invoice.notes}` : "",
+    dashboardUrl ? `\nQuestions? You can reply to this email or contact us from ${dashboardUrl.replace(/\/dashboard$/, "")}.` : "",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+}
+
+function buildInvoiceEmailHtml(invoice, quoteRequest, dashboardUrl, logoUrl) {
+  const lineItems = getInvoiceLineItemsFromRecord(invoice);
+  const itemRows = lineItems
+    .map(
+      (item) => `
+        <tr>
+          <td style="padding:12px;border-bottom:1px solid #d8e4f2;color:#263c55;">${escapeHtml(item.description)}</td>
+          <td style="padding:12px;border-bottom:1px solid #d8e4f2;text-align:right;color:#263c55;font-weight:700;">${escapeHtml(formatCurrency(item.amount))}</td>
+        </tr>
+      `
+    )
+    .join("");
+  const logoMarkup = logoUrl
+    ? `<div style="margin:0 0 18px;text-align:center;"><img src="${escapeHtmlAttr(logoUrl)}" alt="Jason's Lake Ozarks Pro Painting and Remodeling" style="display:inline-block;max-width:260px;width:100%;height:auto;" /></div>`
+    : "";
+  const notesMarkup = invoice.notes
+    ? `<h2 style="margin:22px 0 8px;color:#163f70;font-size:18px;">Notes</h2><p style="margin:0;white-space:pre-wrap;line-height:1.55;">${escapeHtml(invoice.notes)}</p>`
+    : "";
+
+  return `
+    <div style="margin:0;padding:24px;background:#eef4fb;font-family:Arial,sans-serif;color:#263c55;">
+      <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d8e4f2;border-radius:18px;padding:24px;">
+        ${logoMarkup}
+        <p style="margin:0 0 8px;color:#f58220;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">Invoice</p>
+        <h1 style="margin:0 0 10px;color:#163f70;font-size:28px;line-height:1.15;">${escapeHtml(invoice.title || "Project Invoice")}</h1>
+        <p style="margin:0 0 18px;line-height:1.55;">Hi ${escapeHtml(quoteRequest.name || "there")}, here is your invoice for your ${escapeHtml(quoteRequest.service || "project")} request.</p>
+        ${invoice.due_date ? `<p style="margin:0 0 18px;"><strong>Due date:</strong> ${escapeHtml(invoice.due_date)}</p>` : ""}
+        <table style="width:100%;border-collapse:collapse;margin-top:12px;border:1px solid #d8e4f2;">
+          <thead>
+            <tr>
+              <th style="padding:12px;background:#f5f9ff;color:#24486f;text-align:left;">Description</th>
+              <th style="padding:12px;background:#f5f9ff;color:#24486f;text-align:right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>${itemRows}</tbody>
+          <tfoot>
+            <tr>
+              <td style="padding:14px;text-align:right;color:#163f70;font-weight:800;">Total</td>
+              <td style="padding:14px;text-align:right;color:#163f70;font-weight:800;font-size:20px;">${escapeHtml(formatCurrency(invoice.total))}</td>
+            </tr>
+          </tfoot>
+        </table>
+        ${notesMarkup}
+        <p style="margin:24px 0 0;color:#34506f;line-height:1.55;">Questions? Reply to this email and we will help.</p>
+        ${dashboardUrl ? `<p style="margin:8px 0 0;color:#7890aa;font-size:12px;">Invoice created from the owner dashboard.</p>` : ""}
+      </div>
+    </div>
+  `;
+}
+
 async function getQuoteNotificationRecipients() {
   if (!dataLayerState.userEmailColumnReady) {
     return quoteNotificationTo;
@@ -1311,6 +1536,41 @@ async function readStorageBodyAsString(body) {
 
 function createRequestId() {
   return `qr_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createInvoiceId() {
+  return `inv_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function serializeInvoice(invoice) {
+  return {
+    id: invoice.id,
+    quoteRequestId: invoice.quote_request_id,
+    title: invoice.title,
+    total: Number(invoice.total) || 0,
+    status: invoice.status,
+    dueDate: invoice.due_date,
+    sentAt: invoice.sent_at,
+    createdAt: invoice.created_at,
+  };
+}
+
+function getInvoiceLineItemsFromRecord(invoice) {
+  return Array.isArray(invoice.line_items)
+    ? invoice.line_items
+        .map((item) => ({
+          description: cleanValue(item.description),
+          amount: Number(item.amount) || 0,
+        }))
+        .filter((item) => item.description && item.amount > 0)
+    : [];
+}
+
+function formatCurrency(value) {
+  return Number(value || 0).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+  });
 }
 
 function getAttachmentsRoot() {

@@ -72,6 +72,60 @@
         </div>
       </div>
     </div>
+
+    <div class="invoice-modal" id="invoice-modal" hidden>
+      <div class="invoice-modal-backdrop" data-invoice-close></div>
+      <form class="invoice-modal-card" id="invoice-form" role="dialog" aria-modal="true" aria-labelledby="invoice-modal-title">
+        <div class="invoice-modal-head">
+          <div>
+            <p class="login-kicker">Customer Invoice</p>
+            <h2 id="invoice-modal-title">Create Invoice</h2>
+            <p id="invoice-customer-summary">Choose services and pricing for this customer.</p>
+          </div>
+          <button class="invoice-modal-close" type="button" data-invoice-close aria-label="Close invoice form">×</button>
+        </div>
+
+        <input id="invoice-request-id" name="requestId" type="hidden" />
+
+        <div class="invoice-form-grid">
+          <div>
+            <label for="invoice-title">Invoice Title</label>
+            <input id="invoice-title" name="title" type="text" value="Project Invoice" required />
+          </div>
+          <div>
+            <label for="invoice-due-date">Due Date</label>
+            <input id="invoice-due-date" name="dueDate" type="date" />
+          </div>
+        </div>
+
+        <div class="invoice-line-items" id="invoice-line-items">
+          <div class="invoice-line-item">
+            <div>
+              <label>Description</label>
+              <input name="itemDescription" type="text" placeholder="Example: Interior painting labor and materials" required />
+            </div>
+            <div>
+              <label>Amount</label>
+              <input name="itemAmount" type="number" min="0" step="0.01" placeholder="0.00" required />
+            </div>
+          </div>
+        </div>
+
+        <button class="invoice-add-line" id="invoice-add-line" type="button">Add Line Item</button>
+
+        <div>
+          <label for="invoice-notes">Notes / Payment Instructions</label>
+          <textarea id="invoice-notes" name="notes" placeholder="Add payment instructions, deposit notes, or scheduling details."></textarea>
+        </div>
+
+        <p class="form-status" id="invoice-status" role="status" aria-live="polite"></p>
+
+        <div class="invoice-modal-actions">
+          <button class="dashboard-confirm-cancel" type="button" data-invoice-close>Cancel</button>
+          <button class="dashboard-confirm-ok" id="invoice-submit" type="submit">Send Invoice</button>
+        </div>
+      </form>
+    </div>
     <script src="./src/js/main.js"></script>
   </body>
 </html>

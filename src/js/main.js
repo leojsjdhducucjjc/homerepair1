@@ -104,6 +104,15 @@ if (dashboardGrid) {
   const dashboardSummary = document.getElementById("dashboard-summary");
   const dashboardEmpty = document.getElementById("dashboard-empty");
   const clearAllButton = document.getElementById("dashboard-clear-all");
+  const invoiceModal = document.getElementById("invoice-modal");
+  const invoiceForm = document.getElementById("invoice-form");
+  const invoiceStatus = document.getElementById("invoice-status");
+  const invoiceSubmit = document.getElementById("invoice-submit");
+  const invoiceCustomerSummary = document.getElementById("invoice-customer-summary");
+  const invoiceRequestId = document.getElementById("invoice-request-id");
+  const invoiceLineItems = document.getElementById("invoice-line-items");
+  const invoiceAddLine = document.getElementById("invoice-add-line");
+  let dashboardRequests = [];
 
   const loadRequests = async () => {
     try {
@@ -125,6 +134,7 @@ if (dashboardGrid) {
       }
 
       const requests = Array.isArray(result.requests) ? result.requests : [];
+      dashboardRequests = requests;
 
       if (dashboardSummary) {
         dashboardSummary.textContent =
@@ -160,6 +170,18 @@ if (dashboardGrid) {
   };
 
   dashboardGrid.addEventListener("click", async (event) => {
+    const invoiceButton = event.target.closest("[data-create-invoice]");
+    if (invoiceButton) {
+      const requestId = invoiceButton.getAttribute("data-create-invoice") || "";
+      const request = dashboardRequests.find((item) => item.id === requestId);
+
+      if (request) {
+        openInvoiceModal(request);
+      }
+
+      return;
+    }
+
     const deleteButton = event.target.closest("[data-delete-request]");
 
     if (!deleteButton) {
@@ -270,6 +292,90 @@ if (dashboardGrid) {
     });
   }
 
+  if (invoiceAddLine) {
+    invoiceAddLine.addEventListener("click", () => {
+      addInvoiceLineItem();
+    });
+  }
+
+  if (invoiceModal) {
+    invoiceModal.addEventListener("click", (event) => {
+      if (event.target?.matches("[data-invoice-close]")) {
+        closeInvoiceModal();
+      }
+    });
+  }
+
+  if (invoiceForm) {
+    invoiceForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const requestId = invoiceRequestId?.value || "";
+      const title = invoiceForm.elements.title?.value || "";
+      const dueDate = invoiceForm.elements.dueDate?.value || "";
+      const notes = invoiceForm.elements.notes?.value || "";
+      const items = getInvoiceLineItems();
+
+      if (items.length === 0) {
+        if (invoiceStatus) {
+          invoiceStatus.textContent = "Add at least one invoice line item.";
+          invoiceStatus.dataset.state = "error";
+        }
+        return;
+      }
+
+      if (invoiceStatus) {
+        invoiceStatus.textContent = "Sending invoice...";
+        invoiceStatus.dataset.state = "pending";
+      }
+
+      if (invoiceSubmit) {
+        invoiceSubmit.disabled = true;
+        invoiceSubmit.textContent = "Sending...";
+      }
+
+      try {
+        const response = await fetch("/api/invoices", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ requestId, title, dueDate, notes, items }),
+        });
+
+        const result = await response.json().catch(() => ({}));
+
+        if (response.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(result.error || "We could not send that invoice.");
+        }
+
+        if (invoiceStatus) {
+          invoiceStatus.textContent = "Invoice sent.";
+          invoiceStatus.dataset.state = "success";
+        }
+
+        await loadRequests();
+        window.setTimeout(closeInvoiceModal, 700);
+      } catch (error) {
+        if (invoiceStatus) {
+          invoiceStatus.textContent = error.message || "We could not send that invoice.";
+          invoiceStatus.dataset.state = "error";
+        }
+      } finally {
+        if (invoiceSubmit) {
+          invoiceSubmit.disabled = false;
+          invoiceSubmit.textContent = "Send Invoice";
+        }
+      }
+    });
+  }
+
   loadRequests();
 }
 
@@ -336,7 +442,15 @@ function renderRequestCard(request) {
         <h4>Project Details</h4>
         <p>${escapeHtml(request.details || "No project details were added.")}</p>
       </div>
+      ${renderInvoiceSummary(request.invoices)}
       <div class="request-card-actions">
+        <button
+          class="request-invoice-btn"
+          type="button"
+          data-create-invoice="${escapeHtmlAttr(request.id || "")}"
+        >
+          Create Invoice
+        </button>
         <button
           class="request-delete-btn"
           type="button"
@@ -348,6 +462,125 @@ function renderRequestCard(request) {
       </div>
     </article>
   `;
+}
+
+function renderInvoiceSummary(invoices) {
+  if (!Array.isArray(invoices) || invoices.length === 0) {
+    return "";
+  }
+
+  return `
+    <div class="request-details invoice-history">
+      <h4>Invoices Sent</h4>
+      <ul>
+        ${invoices
+          .map(
+            (invoice) => `
+              <li>
+                <span>${escapeHtml(invoice.title || "Invoice")}</span>
+                <strong>${formatMoney(invoice.total || 0)}</strong>
+                <small>${escapeHtml(invoice.sentAt ? new Date(invoice.sentAt).toLocaleString() : "Sent")}</small>
+              </li>
+            `
+          )
+          .join("")}
+      </ul>
+    </div>
+  `;
+}
+
+function openInvoiceModal(request) {
+  const invoiceModal = document.getElementById("invoice-modal");
+  const invoiceForm = document.getElementById("invoice-form");
+  const invoiceStatus = document.getElementById("invoice-status");
+  const invoiceCustomerSummary = document.getElementById("invoice-customer-summary");
+  const invoiceRequestId = document.getElementById("invoice-request-id");
+  const invoiceLineItems = document.getElementById("invoice-line-items");
+
+  if (!invoiceModal || !invoiceForm || !invoiceRequestId || !invoiceLineItems) {
+    return;
+  }
+
+  invoiceForm.reset();
+  invoiceRequestId.value = request.id || "";
+
+  if (invoiceCustomerSummary) {
+    invoiceCustomerSummary.textContent = `Sending to ${request.name || "customer"} at ${request.email || "no email listed"}.`;
+  }
+
+  if (invoiceStatus) {
+    invoiceStatus.textContent = "";
+    delete invoiceStatus.dataset.state;
+  }
+
+  invoiceLineItems.innerHTML = "";
+  addInvoiceLineItem(`${request.service || "Project service"}`, "");
+  invoiceModal.hidden = false;
+  document.body.classList.add("modal-open");
+  invoiceForm.querySelector("input[name='itemDescription']")?.focus();
+}
+
+function closeInvoiceModal() {
+  const invoiceModal = document.getElementById("invoice-modal");
+  const invoiceSubmit = document.getElementById("invoice-submit");
+
+  if (invoiceModal) {
+    invoiceModal.hidden = true;
+  }
+
+  if (invoiceSubmit) {
+    invoiceSubmit.disabled = false;
+    invoiceSubmit.textContent = "Send Invoice";
+  }
+
+  document.body.classList.remove("modal-open");
+}
+
+function addInvoiceLineItem(description = "", amount = "") {
+  const invoiceLineItems = document.getElementById("invoice-line-items");
+
+  if (!invoiceLineItems) {
+    return;
+  }
+
+  const row = document.createElement("div");
+  row.className = "invoice-line-item";
+  row.innerHTML = `
+    <div>
+      <label>Description</label>
+      <input name="itemDescription" type="text" placeholder="Example: Painting labor and materials" value="${escapeHtmlAttr(description)}" required />
+    </div>
+    <div>
+      <label>Amount</label>
+      <input name="itemAmount" type="number" min="0" step="0.01" placeholder="0.00" value="${escapeHtmlAttr(amount)}" required />
+    </div>
+    <button class="invoice-remove-line" type="button" aria-label="Remove line item">×</button>
+  `;
+
+  row.querySelector(".invoice-remove-line")?.addEventListener("click", () => {
+    if (invoiceLineItems.querySelectorAll(".invoice-line-item").length > 1) {
+      row.remove();
+    }
+  });
+
+  invoiceLineItems.append(row);
+}
+
+function getInvoiceLineItems() {
+  return Array.from(document.querySelectorAll("#invoice-line-items .invoice-line-item"))
+    .map((row) => {
+      const description = row.querySelector("input[name='itemDescription']")?.value.trim() || "";
+      const amount = Number(row.querySelector("input[name='itemAmount']")?.value || 0);
+      return { description, amount };
+    })
+    .filter((item) => item.description && Number.isFinite(item.amount) && item.amount > 0);
+}
+
+function formatMoney(value) {
+  return Number(value || 0).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+  });
 }
 
 function renderAttachmentList(attachments) {
