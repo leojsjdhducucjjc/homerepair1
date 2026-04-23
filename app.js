@@ -203,6 +203,11 @@ app.post("/api/quote-requests", (req, res) => {
       return res.status(400).json({ error: "Please fill out all required fields." });
     }
 
+    if (!isValidEmail(payload.email)) {
+      cleanupRequestAttachments(req.uploadRequestId);
+      return res.status(400).json({ error: "Please enter a valid email address." });
+    }
+
     const entry = {
       id: req.uploadRequestId,
       submitted_at: new Date().toISOString(),
@@ -1031,14 +1036,19 @@ async function sendQuoteNotification(request, attachments = []) {
     .join("\n");
   const html = buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl);
 
-  const { error } = await resend.emails.send({
+  const emailPayload = {
     from: quoteNotificationFrom,
     to: recipients,
     subject,
     html,
     text,
-    replyTo: request.email || undefined,
-  });
+  };
+
+  if (isValidEmail(request.email)) {
+    emailPayload.replyTo = request.email;
+  }
+
+  const { error } = await resend.emails.send(emailPayload);
 
   if (error) {
     throw new Error(error.message || "Resend email failed.");
@@ -1141,6 +1151,11 @@ function parseEmailList(value) {
     .split(",")
     .map((email) => email.trim())
     .filter(Boolean);
+}
+
+function isValidEmail(value) {
+  const email = cleanValue(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 function formatSubmittedAt(value) {
