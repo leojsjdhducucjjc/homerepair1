@@ -5,6 +5,7 @@ const path = require("path");
 const express = require("express");
 const multer = require("multer");
 const { createClient } = require("@supabase/supabase-js");
+const { Resend } = require("resend");
 
 loadEnvFile();
 
@@ -16,9 +17,14 @@ const attachmentsBucket = process.env.SUPABASE_ATTACHMENTS_BUCKET || "quote-atta
 const sessionTtlHours = Number(process.env.SESSION_TTL_HOURS) || 24;
 const sessionTtlSeconds = sessionTtlHours * 60 * 60;
 const sessionCookieName = "dashboard_session";
+const quoteNotificationTo = parseEmailList(
+  process.env.QUOTE_NOTIFICATION_TO || process.env.OWNER_EMAIL || ""
+);
+const quoteNotificationFrom = cleanValue(process.env.QUOTE_NOTIFICATION_FROM);
 const hasSupabaseConfig = Boolean(
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
 );
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 const supabase = hasSupabaseConfig
   ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -222,6 +228,10 @@ app.post("/api/quote-requests", (req, res) => {
         error: "We had trouble uploading your photo or file. Please try again, or send your request without attachments and we will follow up with you.",
       });
     }
+
+    sendQuoteNotification(entry, attachments).catch((emailError) => {
+      console.error("Failed to send quote request notification email", emailError);
+    });
 
     res.status(201).json({
       success: true,
@@ -947,6 +957,94 @@ async function deleteStoredAttachments(requestId) {
   }
 }
 
+async function sendQuoteNotification(request, attachments = []) {
+  if (!resend || quoteNotificationTo.length === 0 || !quoteNotificationFrom) {
+    return;
+  }
+
+  const dashboardUrl = getDashboardUrl();
+  const attachmentNames = Array.isArray(attachments)
+    ? attachments.map((attachment) => cleanValue(attachment.originalName)).filter(Boolean)
+    : [];
+  const subject = `New quote request from ${request.name || "website visitor"}`;
+  const text = [
+    "A new free quote request was submitted on the website.",
+    "",
+    `Name: ${request.name || "Not provided"}`,
+    `Phone: ${request.phone || "Not provided"}`,
+    `Email: ${request.email || "Not provided"}`,
+    `Property Address / Area: ${request.city || "Not provided"}`,
+    `Service: ${request.service || "Not provided"}`,
+    `Timeline: ${request.timeline || "Not provided"}`,
+    `Submitted: ${formatSubmittedAt(request.submitted_at)}`,
+    "",
+    "Project Details:",
+    request.details || "No project details were added.",
+    "",
+    `Attachments: ${attachmentNames.length ? attachmentNames.join(", ") : "None"}`,
+    dashboardUrl ? `Dashboard: ${dashboardUrl}` : "",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+  const html = buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl);
+
+  const { error } = await resend.emails.send({
+    from: quoteNotificationFrom,
+    to: quoteNotificationTo,
+    subject,
+    html,
+    text,
+    replyTo: request.email || undefined,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Resend email failed.");
+  }
+}
+
+function buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl) {
+  const fields = [
+    ["Name", request.name || "Not provided"],
+    ["Phone", request.phone || "Not provided"],
+    ["Email", request.email || "Not provided"],
+    ["Property Address / Area", request.city || "Not provided"],
+    ["Service", request.service || "Not provided"],
+    ["Timeline", request.timeline || "Not provided"],
+    ["Submitted", formatSubmittedAt(request.submitted_at)],
+  ];
+  const rows = fields
+    .map(
+      ([label, value]) => `
+        <tr>
+          <td style="padding:10px 12px;border:1px solid #d8e4f2;background:#f5f9ff;font-weight:700;color:#24486f;">${escapeHtml(label)}</td>
+          <td style="padding:10px 12px;border:1px solid #d8e4f2;color:#263c55;">${escapeHtml(value)}</td>
+        </tr>
+      `
+    )
+    .join("");
+  const attachmentText = attachmentNames.length
+    ? attachmentNames.map((name) => `<li>${escapeHtml(name)}</li>`).join("")
+    : "<li>None</li>";
+  const dashboardLink = dashboardUrl
+    ? `<p style="margin:22px 0 0;"><a href="${escapeHtmlAttr(dashboardUrl)}" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#1d5ea8;color:#ffffff;text-decoration:none;font-weight:700;">Open Dashboard</a></p>`
+    : "";
+
+  return `
+    <div style="margin:0;padding:24px;background:#eef4fb;font-family:Arial,sans-serif;color:#263c55;">
+      <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d8e4f2;border-radius:18px;padding:24px;">
+        <p style="margin:0 0 8px;color:#f58220;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">New Website Lead</p>
+        <h1 style="margin:0 0 18px;color:#163f70;font-size:28px;line-height:1.15;">Free Quote Request</h1>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">${rows}</table>
+        <h2 style="margin:0 0 8px;color:#163f70;font-size:18px;">Project Details</h2>
+        <p style="margin:0 0 18px;white-space:pre-wrap;line-height:1.55;">${escapeHtml(request.details || "No project details were added.")}</p>
+        <h2 style="margin:0 0 8px;color:#163f70;font-size:18px;">Attachments</h2>
+        <ul style="margin:0;padding-left:20px;line-height:1.55;">${attachmentText}</ul>
+        ${dashboardLink}
+      </div>
+    </div>
+  `;
+}
+
 function cleanupRequestAttachments(requestId, options = {}) {
   if (!requestId) {
     return;
@@ -971,6 +1069,56 @@ function cleanupRequestAttachments(requestId, options = {}) {
 
 function cleanValue(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function parseEmailList(value) {
+  return cleanValue(value)
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
+}
+
+function formatSubmittedAt(value) {
+  if (!value) {
+    return "Unknown time";
+  }
+
+  try {
+    return new Date(value).toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "America/Chicago",
+    });
+  } catch (_error) {
+    return value;
+  }
+}
+
+function getDashboardUrl() {
+  const siteUrl =
+    cleanValue(process.env.SITE_URL) ||
+    cleanValue(process.env.VERCEL_PROJECT_PRODUCTION_URL) ||
+    cleanValue(process.env.VERCEL_URL);
+
+  if (!siteUrl) {
+    return "";
+  }
+
+  const normalizedUrl = /^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`;
+  return `${normalizedUrl.replace(/\/+$/, "")}/dashboard`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function escapeHtmlAttr(value) {
+  return escapeHtml(value).replaceAll("`", "&#96;");
 }
 
 function getAttachmentManifestPath(requestId) {
