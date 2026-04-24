@@ -753,8 +753,8 @@ async function initializeGoogleAddressAutocomplete(addressInput) {
       await window.google.maps.importLibrary("places");
     }
 
-    if (window.google?.maps?.places?.AutocompleteSuggestion?.fetchAutocompleteSuggestions) {
-      initializeGoogleAddressAutocompleteNew(addressInput);
+    if (window.google?.maps?.places?.AutocompleteService) {
+      initializeGoogleAddressAutocompleteService(addressInput);
       return;
     }
 
@@ -815,7 +815,7 @@ function loadGoogleMapsPlaces(apiKey) {
   return googleMapsScriptPromise;
 }
 
-function initializeGoogleAddressAutocompleteNew(addressInput) {
+function initializeGoogleAddressAutocompleteService(addressInput) {
   addressInput.setAttribute("autocomplete", "off");
   addressInput.setAttribute("spellcheck", "false");
 
@@ -841,6 +841,7 @@ function initializeGoogleAddressAutocompleteNew(addressInput) {
   let activeIndex = -1;
   let suggestions = [];
   let sessionToken = new window.google.maps.places.AutocompleteSessionToken();
+  const autocompleteService = new window.google.maps.places.AutocompleteService();
 
   const clearSuggestions = () => {
     suggestions = [];
@@ -867,20 +868,12 @@ function initializeGoogleAddressAutocompleteNew(addressInput) {
     activeIndex = nextIndex;
   };
 
-  const selectSuggestion = async (suggestion) => {
-    if (!suggestion?.placePrediction) {
+  const selectSuggestion = async (prediction) => {
+    if (!prediction) {
       return;
     }
 
-    const place = suggestion.placePrediction.toPlace();
-    await place.fetchFields({
-      fields: ["formattedAddress"],
-    });
-
-    addressInput.value =
-      place.formattedAddress ||
-      suggestion.placePrediction.text?.text ||
-      addressInput.value;
+    addressInput.value = prediction.description || addressInput.value;
 
     sessionToken = new window.google.maps.places.AutocompleteSessionToken();
     clearSuggestions();
@@ -898,9 +891,9 @@ function initializeGoogleAddressAutocompleteNew(addressInput) {
 
     const fragment = document.createDocumentFragment();
 
-    items.slice(0, 5).forEach((suggestion, index) => {
+    items.slice(0, 5).forEach((prediction, index) => {
       const button = document.createElement("button");
-      const suggestionText = suggestion.placePrediction?.text?.text || "";
+      const suggestionText = prediction.description || "";
       button.type = "button";
       button.className = "address-autocomplete-item";
       button.id = `address-suggestion-${index}`;
@@ -912,7 +905,7 @@ function initializeGoogleAddressAutocompleteNew(addressInput) {
       });
       button.addEventListener("click", async () => {
         try {
-          await selectSuggestion(suggestion);
+          await selectSuggestion(prediction);
         } catch (_error) {
           clearSuggestions();
         }
@@ -936,18 +929,17 @@ function initializeGoogleAddressAutocompleteNew(addressInput) {
     const currentRequest = ++requestCounter;
 
     try {
-      const result =
-        await window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
-          input: query,
-          sessionToken,
-          componentRestrictions: { country: "us" },
-        });
+      const result = await autocompleteService.getPlacePredictions({
+        input: query,
+        sessionToken,
+        componentRestrictions: { country: "us" },
+      });
 
       if (currentRequest !== requestCounter) {
         return;
       }
 
-      renderSuggestions(Array.isArray(result?.suggestions) ? result.suggestions : []);
+      renderSuggestions(Array.isArray(result?.predictions) ? result.predictions : []);
     } catch (_error) {
       clearSuggestions();
     }
