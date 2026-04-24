@@ -1187,6 +1187,51 @@ body.nav-hidden {
   resize: vertical;
 }
 
+.pac-container {
+  margin-top: 0.35rem;
+  border: 1px solid #c7d9ee;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgba(11, 33, 61, 0.16);
+  font-family: "Montserrat", "Arial", sans-serif;
+  z-index: 2000;
+  overflow: hidden;
+}
+
+.pac-item {
+  padding: 0.72rem 0.95rem;
+  border-top: 1px solid #e3edf8;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #284666;
+  cursor: pointer;
+}
+
+.pac-item:first-child {
+  border-top: 0;
+}
+
+.pac-item:hover,
+.pac-item.pac-item-selected {
+  background: #f3f8ff;
+}
+
+.pac-icon {
+  display: none;
+}
+
+.pac-item-query,
+.pac-matched,
+.pac-item span {
+  color: #163f70;
+  font-family: inherit;
+}
+
+.pac-item-query,
+.pac-matched {
+  font-weight: 700;
+}
+
 .submit-btn {
   border: 0;
   padding: 0.7rem 1rem;
