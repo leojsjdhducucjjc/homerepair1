@@ -1889,17 +1889,19 @@ body.nav-hidden {
   }
 
   .hero {
-    padding: 0.25rem 0 0.6rem;
+    padding: 0.2rem 0 0.65rem;
     background: linear-gradient(180deg, #0f3f74 0%, #0a315c 100%);
     overflow: hidden;
   }
 
   .hero-banner-image {
     display: block;
-    width: 100%;
+    width: 112%;
+    max-width: none;
     height: auto;
     object-fit: contain;
     object-position: center center;
+    margin-left: -6%;
     border-top: 1px solid #2f79c8;
     border-bottom: 1px solid #2f79c8;
     border-left: 0;
@@ -2035,10 +2037,10 @@ body.nav-hidden {
   .hero-cta {
     position: static;
     transform: none;
-    width: calc(100% - 1rem);
+    width: calc(100% - 0.9rem);
     margin-left: auto;
     margin-right: auto;
-    margin-top: 0.45rem;
+    margin-top: 0.4rem;
     justify-content: stretch;
     gap: 0.42rem;
   }
