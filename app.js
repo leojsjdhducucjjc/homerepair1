@@ -1215,48 +1215,45 @@ async function sendQuoteNotification(request, attachments = []) {
   }
 
   const dashboardUrl = getDashboardUrl();
+  const siteUrl = getSiteUrl();
   const logoUrl = getPublicAssetUrl("/assets/header-logo.png");
   const attachmentNames = Array.isArray(attachments)
     ? attachments.map((attachment) => cleanValue(attachment.originalName)).filter(Boolean)
     : [];
-  const subject = `New quote request from ${request.name || "website visitor"}`;
-  const text = [
-    "A new free quote request was submitted on the website.",
-    "",
-    `Name: ${request.name || "Not provided"}`,
-    `Phone: ${request.phone || "Not provided"}`,
-    `Email: ${request.email || "Not provided"}`,
-    `Property Address / Area: ${request.city || "Not provided"}`,
-    `Service: ${request.service || "Not provided"}`,
-    `Timeline: ${request.timeline || "Not provided"}`,
-    `Submitted: ${formatSubmittedAt(request.submitted_at)}`,
-    "",
-    "Project Details:",
-    request.details || "No project details were added.",
-    "",
-    `Attachments: ${attachmentNames.length ? attachmentNames.join(", ") : "None"}`,
-    dashboardUrl ? `Dashboard: ${dashboardUrl}` : "",
-  ]
-    .filter((line) => line !== "")
-    .join("\n");
-  const html = buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl, logoUrl);
-
-  const emailPayload = {
+  const ownerEmailPayload = {
     from: quoteNotificationFrom,
     to: recipients,
-    subject,
-    html,
-    text,
+    subject: `New quote request from ${request.name || "website visitor"}`,
+    html: buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl, logoUrl),
+    text: buildQuoteNotificationText(request, attachmentNames, dashboardUrl),
   };
 
   if (isValidEmail(request.email)) {
-    emailPayload.replyTo = request.email;
+    ownerEmailPayload.replyTo = request.email;
   }
 
-  const { error } = await resend.emails.send(emailPayload);
+  const { error } = await resend.emails.send(ownerEmailPayload);
 
   if (error) {
     throw new Error(error.message || "Resend email failed.");
+  }
+
+  if (!isValidEmail(request.email)) {
+    return;
+  }
+
+  const customerEmailPayload = {
+    from: quoteNotificationFrom,
+    to: request.email,
+    subject: "We received your free quote request",
+    html: buildQuoteConfirmationHtml(request, attachmentNames, siteUrl, logoUrl),
+    text: buildQuoteConfirmationText(request, attachmentNames, siteUrl),
+  };
+
+  const customerEmailResult = await resend.emails.send(customerEmailPayload);
+
+  if (customerEmailResult.error) {
+    throw new Error(customerEmailResult.error.message || "Resend customer confirmation email failed.");
   }
 }
 
@@ -1496,6 +1493,97 @@ function buildQuoteNotificationHtml(request, attachmentNames, dashboardUrl, logo
         <h2 style="margin:0 0 8px;color:#163f70;font-size:18px;">Attachments</h2>
         <ul style="margin:0;padding-left:20px;line-height:1.55;">${attachmentText}</ul>
         ${dashboardLink}
+      </div>
+    </div>
+  `;
+}
+
+function buildQuoteNotificationText(request, attachmentNames, dashboardUrl) {
+  return [
+    "A new free quote request was submitted on the website.",
+    "",
+    `Name: ${request.name || "Not provided"}`,
+    `Phone: ${request.phone || "Not provided"}`,
+    `Email: ${request.email || "Not provided"}`,
+    `Property Address / Area: ${request.city || "Not provided"}`,
+    `Service: ${request.service || "Not provided"}`,
+    `Timeline: ${request.timeline || "Not provided"}`,
+    `Submitted: ${formatSubmittedAt(request.submitted_at)}`,
+    "",
+    "Project Details:",
+    request.details || "No project details were added.",
+    "",
+    `Attachments: ${attachmentNames.length ? attachmentNames.join(", ") : "None"}`,
+    dashboardUrl ? `Dashboard: ${dashboardUrl}` : "",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+}
+
+function buildQuoteConfirmationText(request, attachmentNames, siteUrl) {
+  return [
+    `Hi ${request.name || "there"},`,
+    "",
+    "We received your free quote request and will review it shortly.",
+    "",
+    `Service: ${request.service || "Not provided"}`,
+    `Property Address / Area: ${request.city || "Not provided"}`,
+    `Timeline: ${request.timeline || "Not provided"}`,
+    `Submitted: ${formatSubmittedAt(request.submitted_at)}`,
+    "",
+    "Project Details:",
+    request.details || "No project details were added.",
+    "",
+    `Attachments Received: ${attachmentNames.length ? attachmentNames.join(", ") : "None"}`,
+    "",
+    "If you need to add anything else, just reply to this email.",
+    siteUrl ? `Website: ${siteUrl}` : "",
+  ]
+    .filter((line) => line !== "")
+    .join("\n");
+}
+
+function buildQuoteConfirmationHtml(request, attachmentNames, siteUrl, logoUrl) {
+  const fields = [
+    ["Service", request.service || "Not provided"],
+    ["Property Address / Area", request.city || "Not provided"],
+    ["Timeline", request.timeline || "Not provided"],
+    ["Submitted", formatSubmittedAt(request.submitted_at)],
+  ];
+  const rows = fields
+    .map(
+      ([label, value]) => `
+        <tr>
+          <td style="padding:10px 12px;border:1px solid #d8e4f2;background:#f5f9ff;font-weight:700;color:#24486f;">${escapeHtml(label)}</td>
+          <td style="padding:10px 12px;border:1px solid #d8e4f2;color:#263c55;">${escapeHtml(value)}</td>
+        </tr>
+      `
+    )
+    .join("");
+  const attachmentText = attachmentNames.length
+    ? attachmentNames.map((name) => `<li>${escapeHtml(name)}</li>`).join("")
+    : "<li>None</li>";
+  const logoMarkup = logoUrl
+    ? `<div style="margin:0 0 18px;text-align:center;"><img src="${escapeHtmlAttr(logoUrl)}" alt="Jason's Lake Ozarks Pro Painting and Remodeling" style="display:inline-block;max-width:260px;width:100%;height:auto;" /></div>`
+    : "";
+  const siteButton = siteUrl
+    ? `<p style="margin:22px 0 0;"><a href="${escapeHtmlAttr(siteUrl)}" style="display:inline-block;padding:12px 18px;border-radius:999px;background:#1d5ea8;color:#ffffff;text-decoration:none;font-weight:700;">Visit Website</a></p>`
+    : "";
+
+  return `
+    <div style="margin:0;padding:24px;background:#eef4fb;font-family:Arial,sans-serif;color:#263c55;">
+      <div style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d8e4f2;border-radius:18px;padding:24px;">
+        ${logoMarkup}
+        <p style="margin:0 0 8px;color:#f58220;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">Quote Request Received</p>
+        <h1 style="margin:0 0 12px;color:#163f70;font-size:28px;line-height:1.15;">Thanks, ${escapeHtml(request.name || "there")}</h1>
+        <p style="margin:0 0 18px;line-height:1.55;">We received your free quote request and will review the details shortly. Here is a copy of what you sent us.</p>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">${rows}</table>
+        <h2 style="margin:0 0 8px;color:#163f70;font-size:18px;">Project Details</h2>
+        <p style="margin:0 0 18px;white-space:pre-wrap;line-height:1.55;">${escapeHtml(request.details || "No project details were added.")}</p>
+        <h2 style="margin:0 0 8px;color:#163f70;font-size:18px;">Attachments Received</h2>
+        <ul style="margin:0;padding-left:20px;line-height:1.55;">${attachmentText}</ul>
+        <p style="margin:22px 0 0;line-height:1.55;">If you want to add more details before we follow up, just reply to this email.</p>
+        ${siteButton}
       </div>
     </div>
   `;
