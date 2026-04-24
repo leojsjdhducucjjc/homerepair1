@@ -1156,6 +1156,10 @@ body.nav-hidden {
   gap: 0.55rem;
 }
 
+.address-autocomplete {
+  position: relative;
+}
+
 .contact-form label {
   display: block;
   font-size: 0.8rem;
@@ -1185,6 +1189,43 @@ body.nav-hidden {
 .contact-form textarea {
   min-height: 120px;
   resize: vertical;
+}
+
+.address-autocomplete-menu {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  border: 1px solid #c7d9ee;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgba(11, 33, 61, 0.16);
+  z-index: 2000;
+  overflow: hidden;
+}
+
+.address-autocomplete-item {
+  display: block;
+  width: 100%;
+  padding: 0.72rem 0.95rem;
+  border: 0;
+  border-top: 1px solid #e3edf8;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #163f70;
+  cursor: pointer;
+}
+
+.address-autocomplete-item:first-child {
+  border-top: 0;
+}
+
+.address-autocomplete-item:hover,
+.address-autocomplete-item.is-active {
+  background: #f3f8ff;
 }
 
 .pac-container {

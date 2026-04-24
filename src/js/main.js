@@ -749,6 +749,15 @@ async function initializeGoogleAddressAutocomplete(addressInput) {
 
     await loadGoogleMapsPlaces(apiKey);
 
+    if (typeof window.google?.maps?.importLibrary === "function") {
+      await window.google.maps.importLibrary("places");
+    }
+
+    if (window.google?.maps?.places?.AutocompleteSuggestion?.fetchAutocompleteSuggestions) {
+      initializeGoogleAddressAutocompleteNew(addressInput);
+      return;
+    }
+
     if (!window.google?.maps?.places?.Autocomplete) {
       return;
     }
@@ -804,4 +813,202 @@ function loadGoogleMapsPlaces(apiKey) {
   });
 
   return googleMapsScriptPromise;
+}
+
+function initializeGoogleAddressAutocompleteNew(addressInput) {
+  addressInput.setAttribute("autocomplete", "off");
+  addressInput.setAttribute("spellcheck", "false");
+
+  const wrapper = addressInput.parentElement;
+
+  if (!wrapper) {
+    return;
+  }
+
+  wrapper.classList.add("address-autocomplete");
+
+  let dropdown = wrapper.querySelector(".address-autocomplete-menu");
+
+  if (!dropdown) {
+    dropdown = document.createElement("div");
+    dropdown.className = "address-autocomplete-menu";
+    dropdown.hidden = true;
+    dropdown.setAttribute("role", "listbox");
+    wrapper.appendChild(dropdown);
+  }
+
+  let requestCounter = 0;
+  let activeIndex = -1;
+  let suggestions = [];
+  let sessionToken = new window.google.maps.places.AutocompleteSessionToken();
+
+  const clearSuggestions = () => {
+    suggestions = [];
+    activeIndex = -1;
+    dropdown.innerHTML = "";
+    dropdown.hidden = true;
+    addressInput.removeAttribute("aria-activedescendant");
+    addressInput.setAttribute("aria-expanded", "false");
+  };
+
+  const setActiveSuggestion = (nextIndex) => {
+    const items = Array.from(dropdown.querySelectorAll(".address-autocomplete-item"));
+
+    items.forEach((item, index) => {
+      const isActive = index === nextIndex;
+      item.classList.toggle("is-active", isActive);
+      item.setAttribute("aria-selected", isActive ? "true" : "false");
+
+      if (isActive) {
+        addressInput.setAttribute("aria-activedescendant", item.id);
+      }
+    });
+
+    activeIndex = nextIndex;
+  };
+
+  const selectSuggestion = async (suggestion) => {
+    if (!suggestion?.placePrediction) {
+      return;
+    }
+
+    const place = suggestion.placePrediction.toPlace();
+    await place.fetchFields({
+      fields: ["formattedAddress"],
+    });
+
+    addressInput.value =
+      place.formattedAddress ||
+      suggestion.placePrediction.text?.text ||
+      addressInput.value;
+
+    sessionToken = new window.google.maps.places.AutocompleteSessionToken();
+    clearSuggestions();
+  };
+
+  const renderSuggestions = (items) => {
+    suggestions = items;
+    activeIndex = -1;
+    dropdown.innerHTML = "";
+
+    if (!items.length) {
+      clearSuggestions();
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+
+    items.slice(0, 5).forEach((suggestion, index) => {
+      const button = document.createElement("button");
+      const suggestionText = suggestion.placePrediction?.text?.text || "";
+      button.type = "button";
+      button.className = "address-autocomplete-item";
+      button.id = `address-suggestion-${index}`;
+      button.setAttribute("role", "option");
+      button.setAttribute("aria-selected", "false");
+      button.textContent = suggestionText;
+      button.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+      });
+      button.addEventListener("click", async () => {
+        try {
+          await selectSuggestion(suggestion);
+        } catch (_error) {
+          clearSuggestions();
+        }
+      });
+      fragment.appendChild(button);
+    });
+
+    dropdown.appendChild(fragment);
+    dropdown.hidden = false;
+    addressInput.setAttribute("aria-expanded", "true");
+  };
+
+  const fetchSuggestions = debounce(async () => {
+    const query = addressInput.value.trim();
+
+    if (query.length < 3) {
+      clearSuggestions();
+      return;
+    }
+
+    const currentRequest = ++requestCounter;
+
+    try {
+      const result =
+        await window.google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          input: query,
+          sessionToken,
+          componentRestrictions: { country: "us" },
+        });
+
+      if (currentRequest !== requestCounter) {
+        return;
+      }
+
+      renderSuggestions(Array.isArray(result?.suggestions) ? result.suggestions : []);
+    } catch (_error) {
+      clearSuggestions();
+    }
+  }, 220);
+
+  addressInput.setAttribute("role", "combobox");
+  addressInput.setAttribute("aria-autocomplete", "list");
+  addressInput.setAttribute("aria-expanded", "false");
+
+  addressInput.addEventListener("input", () => {
+    fetchSuggestions();
+  });
+
+  addressInput.addEventListener("keydown", async (event) => {
+    if (dropdown.hidden || suggestions.length === 0) {
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveSuggestion(activeIndex < suggestions.length - 1 ? activeIndex + 1 : 0);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveSuggestion(activeIndex > 0 ? activeIndex - 1 : suggestions.length - 1);
+      return;
+    }
+
+    if (event.key === "Enter" && activeIndex >= 0) {
+      event.preventDefault();
+
+      try {
+        await selectSuggestion(suggestions[activeIndex]);
+      } catch (_error) {
+        clearSuggestions();
+      }
+
+      return;
+    }
+
+    if (event.key === "Escape") {
+      clearSuggestions();
+    }
+  });
+
+  addressInput.addEventListener("blur", () => {
+    window.setTimeout(() => {
+      clearSuggestions();
+    }, 150);
+  });
+}
+
+function debounce(callback, delay) {
+  let timeoutId = null;
+
+  return (...args) => {
+    window.clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(() => {
+      callback(...args);
+    }, delay);
+  };
 }
