@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/index.js": {
-      "includeFiles": "{assets/**,src/**,*.html,supabase/**}"
+      "includeFiles": "{assets/**,src/**,*.html,*.xml,*.txt,supabase/**}"
     }
   },
   "rewrites": [
