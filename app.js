@@ -12,6 +12,7 @@ loadEnvFile();
 const app = express();
 const rootDir = __dirname;
 const legacyRequestsFile = path.join(rootDir, "data", "quote-requests.json");
+const legacyReviewsFile = path.join(rootDir, "data", "reviews.json");
 const attachmentsRoot = getAttachmentsRoot();
 const attachmentsBucket = process.env.SUPABASE_ATTACHMENTS_BUCKET || "quote-attachments";
 const sessionTtlHours = Number(process.env.SESSION_TTL_HOURS) || 24;
@@ -74,6 +75,7 @@ const dataLayerState = {
   ready: false,
   error: hasSupabaseConfig ? null : "Supabase is not configured yet.",
   userEmailColumnReady: false,
+  reviewsTableReady: false,
 };
 
 const dataLayerReadyPromise = initializeDataLayer();
@@ -299,6 +301,40 @@ app.get("/api/maps-config", (_req, res) => {
   });
 });
 
+app.get("/api/reviews", async (_req, res) => {
+  try {
+    const reviews = await loadReviews();
+    res.json({ reviews });
+  } catch (error) {
+    console.error("Failed to load reviews", error);
+    res.status(500).json({ error: "We could not load reviews right now." });
+  }
+});
+
+app.post("/api/reviews", async (req, res) => {
+  const payload = normalizeReview(req.body);
+
+  if (!payload.name || !payload.quote || !payload.rating) {
+    return res
+      .status(400)
+      .json({ error: "Please add your name, a star rating, and a short review." });
+  }
+
+  if (payload.quote.length < 20) {
+    return res
+      .status(400)
+      .json({ error: "Please add a little more detail so your review is helpful." });
+  }
+
+  try {
+    const review = await saveReview(payload);
+    res.status(201).json({ success: true, review });
+  } catch (error) {
+    console.error("Failed to save review", error);
+    res.status(500).json({ error: "We could not save your review right now." });
+  }
+});
+
 app.get("/dashboard", requireAuthenticatedPage, (_req, res) => {
   res.sendFile(path.join(rootDir, "dashboard.html"));
 });
@@ -508,6 +544,7 @@ async function initializeDataLayer() {
 
   try {
     await detectUserEmailColumn();
+    await detectReviewsTable();
     await seedOwnerUser();
     await ensureAttachmentsBucket();
     await migrateLegacyQuoteRequests();
@@ -676,6 +713,17 @@ async function detectUserEmailColumn() {
   if (error) {
     console.warn(
       "Supabase users.email column is not available yet. Email login and database-based notification recipients will stay disabled until the schema is updated."
+    );
+  }
+}
+
+async function detectReviewsTable() {
+  const { error } = await supabase.from("reviews").select("id").limit(1);
+  dataLayerState.reviewsTableReady = !error;
+
+  if (error) {
+    console.warn(
+      "Supabase reviews table is not available yet. Public review submissions will fall back to local storage until the schema is updated."
     );
   }
 }
@@ -960,6 +1008,20 @@ function normalizeRequest(body) {
     service: cleanValue(body.service),
     timeline: cleanValue(body.timeline),
     details: cleanValue(body.details),
+  };
+}
+
+function normalizeReview(body) {
+  const rating = Number.parseInt(
+    typeof body.rating === "number" ? String(body.rating) : cleanValue(body.rating),
+    10
+  );
+
+  return {
+    name: cleanValue(body.name),
+    city: cleanValue(body.city),
+    rating: Number.isFinite(rating) && rating >= 1 && rating <= 5 ? rating : 0,
+    quote: cleanValue(body.quote),
   };
 }
 
@@ -1255,6 +1317,95 @@ async function sendQuoteNotification(request, attachments = []) {
   if (customerEmailResult.error) {
     throw new Error(customerEmailResult.error.message || "Resend customer confirmation email failed.");
   }
+}
+
+async function loadReviews() {
+  if (hasSupabaseConfig && dataLayerState.reviewsTableReady) {
+    const { data, error } = await supabase
+      .from("reviews")
+      .select("id, submitted_at, name, city, rating, quote")
+      .order("submitted_at", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message || "Could not load reviews.");
+    }
+
+    return (data || []).map(serializeReview).filter(Boolean);
+  }
+
+  const reviews = readJsonArray(legacyReviewsFile);
+  return reviews
+    .map(serializeReview)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0));
+}
+
+async function saveReview(payload) {
+  const review = {
+    id: createReviewId(),
+    submitted_at: new Date().toISOString(),
+    name: payload.name,
+    city: payload.city,
+    rating: payload.rating,
+    quote: payload.quote,
+  };
+
+  if (hasSupabaseConfig && dataLayerState.reviewsTableReady) {
+    const { error } = await supabase.from("reviews").insert(review);
+
+    if (error) {
+      throw new Error(error.message || "Could not save review.");
+    }
+
+    return serializeReview(review);
+  }
+
+  const reviews = readJsonArray(legacyReviewsFile);
+  reviews.unshift(review);
+  writeJsonArray(legacyReviewsFile, reviews);
+  return serializeReview(review);
+}
+
+function serializeReview(review) {
+  const name = cleanValue(review?.name);
+  const quote = cleanValue(review?.quote);
+  const rating = Number.parseInt(review?.rating, 10);
+
+  if (!name || !quote || !Number.isFinite(rating) || rating < 1 || rating > 5) {
+    return null;
+  }
+
+  return {
+    id: cleanValue(review.id) || createReviewId(),
+    submittedAt: cleanValue(review.submitted_at || review.submittedAt) || "",
+    name,
+    city: cleanValue(review?.city),
+    rating,
+    quote,
+  };
+}
+
+function readJsonArray(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return [];
+  }
+
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error(`Failed to read JSON array from ${filePath}`, error);
+    return [];
+  }
+}
+
+function writeJsonArray(filePath, rows) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(Array.isArray(rows) ? rows : [], null, 2));
+}
+
+function createReviewId() {
+  return `review_${crypto.randomBytes(8).toString("hex")}`;
 }
 
 async function sendInvoiceEmail(invoice, quoteRequest) {

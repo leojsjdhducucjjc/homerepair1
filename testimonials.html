@@ -46,6 +46,21 @@
         <section class="page-hero"><h1>Customer Testimonials</h1><p>Real feedback from homeowners and rental property owners around Lake of the Ozarks.</p></section>
 
         <section class="page-content">
+          <section class="review-highlight-strip" aria-label="Why people recommend us">
+            <article class="review-highlight-card">
+              <p class="review-highlight-value">Lake Local</p>
+              <p class="review-highlight-label">Feedback from lake homes, rentals, and remodel clients.</p>
+            </article>
+            <article class="review-highlight-card">
+              <p class="review-highlight-value">Free Estimates</p>
+              <p class="review-highlight-label">No travel fee and a clearer first conversation from the start.</p>
+            </article>
+            <article class="review-highlight-card">
+              <p class="review-highlight-value">Detailed Work</p>
+              <p class="review-highlight-label">Painting, flooring, washing, and remodel projects handled in one place.</p>
+            </article>
+          </section>
+
           <section class="content-grid-3">
             <article class="testimonial-card">
               <p class="stars" aria-label="5 out of 5 stars">&#9733; &#9733; &#9733; &#9733; &#9733;</p>
@@ -76,6 +91,49 @@
               <p class="stars" aria-label="5 out of 5 stars">&#9733; &#9733; &#9733; &#9733; &#9733;</p>
               <p class="quote">"Everything from quote to final walkthrough was straightforward and stress-free."</p>
               <div class="person-row"><div class="person-meta"><p class="name">Nicole P.</p><p class="city">Four Seasons</p></div><div class="avatar">NP</div></div>
+            </article>
+          </section>
+
+          <section class="content-grid-2 reviews-layout">
+            <article class="content-card">
+              <h2>Leave a Review</h2>
+              <p>Worked with us on your lake home, rental, or remodel? Share a quick review so future customers know what to expect.</p>
+              <form class="review-form" data-review-form>
+                <div class="form-row">
+                  <div>
+                    <label for="review-name">Name</label>
+                    <input id="review-name" name="name" type="text" autocomplete="name" required />
+                  </div>
+                  <div>
+                    <label for="review-city">City / Area</label>
+                    <input id="review-city" name="city" type="text" autocomplete="address-level2" placeholder="Lake Ozark" />
+                  </div>
+                </div>
+                <div>
+                  <label for="review-rating">Rating</label>
+                  <select id="review-rating" name="rating" required>
+                    <option value="">Choose a rating</option>
+                    <option value="5">5 stars</option>
+                    <option value="4">4 stars</option>
+                    <option value="3">3 stars</option>
+                    <option value="2">2 stars</option>
+                    <option value="1">1 star</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="review-quote">Your review</label>
+                  <textarea id="review-quote" name="quote" rows="5" placeholder="Tell people what service you used and how it went." required></textarea>
+                </div>
+                <p class="review-note">We only show your first name and city/area on the public site.</p>
+                <p class="form-status" data-review-status aria-live="polite"></p>
+                <button class="submit-btn" type="submit">Send Review</button>
+              </form>
+            </article>
+            <article class="content-card">
+              <h2>Recent Reviews</h2>
+              <p>New reviews submitted through the site will show up here after they are received.</p>
+              <div class="content-grid-3 review-grid review-grid-single" data-reviews-grid></div>
+              <p class="form-status review-grid-status" data-reviews-load-status aria-live="polite"></p>
             </article>
           </section>
 

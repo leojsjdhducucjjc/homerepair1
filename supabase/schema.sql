@@ -61,3 +61,14 @@ create index if not exists quote_requests_submitted_at_idx on public.quote_reque
 create unique index if not exists users_email_unique_idx on public.users (lower(email)) where email is not null and email <> '';
 create index if not exists invoices_quote_request_id_idx on public.invoices(quote_request_id);
 create index if not exists invoices_created_at_idx on public.invoices(created_at desc);
+
+create table if not exists public.reviews (
+  id text primary key,
+  submitted_at timestamptz not null default now(),
+  name text not null,
+  city text not null default '',
+  rating integer not null check (rating between 1 and 5),
+  quote text not null
+);
+
+create index if not exists reviews_submitted_at_idx on public.reviews(submitted_at desc);

@@ -98,6 +98,112 @@ if (quoteForm) {
   });
 }
 
+const reviewForm = document.querySelector("[data-review-form]");
+if (reviewForm) {
+  const reviewGrid = document.querySelector("[data-reviews-grid]");
+  const reviewStatus = reviewForm.querySelector("[data-review-status]");
+  const reviewsLoadStatus = document.querySelector("[data-reviews-load-status]");
+  const reviewSubmitButton = reviewForm.querySelector(".submit-btn");
+
+  const loadReviews = async () => {
+    if (!reviewGrid) {
+      return;
+    }
+
+    if (reviewsLoadStatus) {
+      reviewsLoadStatus.textContent = "Loading reviews...";
+      reviewsLoadStatus.dataset.state = "pending";
+    }
+
+    try {
+      const response = await fetch("/api/reviews", {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || "We could not load reviews.");
+      }
+
+      const reviews = Array.isArray(result.reviews) ? result.reviews : [];
+      reviewGrid.innerHTML = reviews.length
+        ? reviews.map(renderPublicReviewCard).join("")
+        : `<article class="testimonial-card"><p class="quote">No site reviews yet. Be the first to leave one.</p></article>`;
+
+      if (reviewsLoadStatus) {
+        reviewsLoadStatus.textContent = "";
+        delete reviewsLoadStatus.dataset.state;
+      }
+    } catch (error) {
+      if (reviewsLoadStatus) {
+        reviewsLoadStatus.textContent = error.message || "We could not load reviews.";
+        reviewsLoadStatus.dataset.state = "error";
+      }
+    }
+  };
+
+  reviewForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const formData = new FormData(reviewForm);
+    const payload = {
+      name: formData.get("name") || "",
+      city: formData.get("city") || "",
+      rating: formData.get("rating") || "",
+      quote: formData.get("quote") || "",
+    };
+
+    if (reviewStatus) {
+      reviewStatus.textContent = "Sending your review...";
+      reviewStatus.dataset.state = "pending";
+    }
+
+    if (reviewSubmitButton) {
+      reviewSubmitButton.disabled = true;
+      reviewSubmitButton.textContent = "Sending...";
+    }
+
+    try {
+      const response = await fetch("/api/reviews", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || "We could not save your review.");
+      }
+
+      reviewForm.reset();
+
+      if (reviewStatus) {
+        reviewStatus.textContent = "Review sent. Thank you for sharing your feedback.";
+        reviewStatus.dataset.state = "success";
+      }
+
+      await loadReviews();
+    } catch (error) {
+      if (reviewStatus) {
+        reviewStatus.textContent = error.message || "We could not save your review.";
+        reviewStatus.dataset.state = "error";
+      }
+    } finally {
+      if (reviewSubmitButton) {
+        reviewSubmitButton.disabled = false;
+        reviewSubmitButton.textContent = "Send Review";
+      }
+    }
+  });
+
+  loadReviews();
+}
+
 const dashboardGrid = document.getElementById("dashboard-grid");
 if (dashboardGrid) {
   const dashboardStatus = document.getElementById("dashboard-status");
@@ -384,8 +490,6 @@ if (navShell) {
   const root = document.documentElement;
   let lastScrollY = window.scrollY;
   let ticking = false;
-  const toggleDelta = 8;
-  const bottomLockOffset = 2;
 
   const updateNavHeight = () => {
     root.style.setProperty("--nav-shell-height", `${navShell.offsetHeight}px`);
@@ -402,20 +506,12 @@ if (navShell) {
       ticking = true;
       window.requestAnimationFrame(() => {
         const currentY = window.scrollY;
-        const maxScrollY = document.documentElement.scrollHeight - window.innerHeight;
-        const isNearPageBottom = maxScrollY - currentY <= bottomLockOffset;
-
-        if (isNearPageBottom) {
-          lastScrollY = currentY;
-          ticking = false;
-          return;
-        }
 
         if (currentY <= 20) {
           document.body.classList.remove("nav-hidden");
-        } else if (currentY > lastScrollY + toggleDelta) {
+        } else if (currentY > lastScrollY + 8) {
           document.body.classList.add("nav-hidden");
-        } else if (currentY < lastScrollY - toggleDelta) {
+        } else if (currentY < lastScrollY - 8) {
           document.body.classList.remove("nav-hidden");
         }
 
@@ -469,6 +565,26 @@ function renderRequestCard(request) {
         >
           Delete Request
         </button>
+      </div>
+    </article>
+  `;
+}
+
+function renderPublicReviewCard(review) {
+  const cityMarkup = review.city
+    ? `<p class="city">${escapeHtml(review.city)}</p>`
+    : "";
+
+  return `
+    <article class="testimonial-card">
+      <p class="stars" aria-label="${escapeHtmlAttr(`${review.rating || 5} out of 5 stars`)}">${renderStarString(review.rating || 5)}</p>
+      <p class="quote">"${escapeHtml(review.quote || "")}"</p>
+      <div class="person-row">
+        <div class="person-meta">
+          <p class="name">${escapeHtml(review.name || "Customer")}</p>
+          ${cityMarkup}
+        </div>
+        <div class="avatar">${escapeHtml(getInitials(review.name || "Customer"))}</div>
       </div>
     </article>
   `;
@@ -613,6 +729,24 @@ function renderAttachmentList(attachments) {
       ${fileAttachments.length > 0 ? renderAttachmentFileList(fileAttachments) : ""}
     </div>
   `;
+}
+
+function renderStarString(rating) {
+  return Array.from({ length: 5 }, (_, index) => (index < rating ? "★" : "☆")).join(" ");
+}
+
+function getInitials(name) {
+  const parts = String(name)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 0) {
+    return "JR";
+  }
+
+  return parts.map((part) => part[0]?.toUpperCase() || "").join("");
 }
 
 function renderAttachmentPreviewGrid(attachments) {
