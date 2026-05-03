@@ -1,5 +1,18 @@
 {
   "version": 2,
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "jasonspropainting.com"
+        }
+      ],
+      "destination": "https://www.jasonspropainting.com/$1",
+      "permanent": true
+    }
+  ],
   "functions": {
     "api/index.js": {
       "includeFiles": "{assets/**,src/**,*.html,*.xml,*.txt,supabase/**}"
